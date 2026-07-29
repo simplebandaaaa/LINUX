@@ -36,8 +36,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 🚨 OFFICIAL MOZILLA FIREFOX DEPLOYMENT (100% पक्का डाउनलोड और एक्सट्रेक्ट) 🚨
-# यह सीधा मोज़िला के सर्वर से स्टेबल लिनक्स बाइनरी उठाएगा, जो कभी फेल नहीं होती
+# 🚨 OFFICIAL MOZILLA FIREFOX DEPLOYMENT 🚨
+# यह सीधा मोज़िला के सर्ver से स्टेबल लिनक्स बाइनरी उठाएगा
 RUN mkdir -p /opt && \
     curl -Lo /tmp/firefox.tar.bz2 "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US" && \
     tar -jxvf /tmp/firefox.tar.bz2 -C /opt/ && \
