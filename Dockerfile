@@ -20,8 +20,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dbus-user-session \
     sudo \
     wget \
-    curl \
-    bzip2 \
     ca-certificates \
     ssl-cert \
     wine \
@@ -36,13 +34,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 🚨 OFFICIAL MOZILLA FIREFOX DEPLOYMENT 🚨
-# यह सीधा मोज़िला के सर्ver से स्टेबल लिनक्स बाइनरी उठाएगा
-RUN mkdir -p /opt && \
-    curl -Lo /tmp/firefox.tar.bz2 "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US" && \
-    tar -jxvf /tmp/firefox.tar.bz2 -C /opt/ && \
-    ln -s /opt/firefox/firefox /usr/local/bin/firefox && \
-    rm /tmp/firefox.tar.bz2
+# 🚨 SECURITY & REGULAR FIREFOX DEPLOYMENT 🚨
+RUN apt-get update && apt-get install -y software-properties-common && \
+    add-apt-repository -y ppa:mozillateam/ppa && \
+    printf 'Package: firefox*\nPin: release o=LP-PPA-mozillateam\nPin-Priority: 1001\n' > /etc/apt/preferences.d/mozilla-firefox && \
+    apt-get update && apt-get install -y --no-install-recommends firefox && \
+    ln -sf /usr/bin/firefox /usr/local/bin/firefox && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ---- 🛠️ SAFE USER SETUP ---- #
 RUN echo "ubuntu:ubuntu" | chpasswd && \
