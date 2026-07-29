@@ -12,16 +12,13 @@ rm -rf /tmp/.X* /tmp/.x* /var/run/xrdp/*
 mkdir -p /var/run/xrdp
 chown xrdp:xrdp /var/run/xrdp
 
-# 3. System D-Bus को शुरू करना
+# 3. System D-Bus को बैकग्राउंड में शुरू करना
 mkdir -p /var/run/dbus
 rm -f /var/run/dbus/pid
 dbus-uuidgen --ensure
 dbus-daemon --system --fork
 
-# डेस्कटॉप आइकॉन ओनरशिप फिक्स
-chown ubuntu:ubuntu /home/ubuntu/Desktop/firefox.desktop || true
-
-# 4. XRDP सर्विसेस लॉन्च
+# 4. XRDP सर्विसेस को लॉन्च करना
 echo "Starting XRDP Session Manager..."
 xrdp-sesman --config /etc/xrdp/sesman.ini
 
