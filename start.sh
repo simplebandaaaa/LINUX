@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# 1. Ngrok download aur setup karna
+# 1. Ngrok download aur setup karna (Fixed v3 Link)
 echo "Downloading ngrok v3..."
-wget -q https://bin.equinox.io/c/bNy819Qbg8T/ngrok-stable-linux-amd64.tgz
-tar -xf ngrok-stable-linux-amd64.tgz
-rm ngrok-stable-linux-amd64.tgz
+wget -q https://bin.equinox.io/c/bNy819Qbg8T/ngrok-v3-stable-linux-amd64.tgz
+tar -xf ngrok-v3-stable-linux-amd64.tgz
+rm ngrok-v3-stable-linux-amd64.tgz
 chmod +x ./ngrok
 
 # 2. Ngrok TCP tunnel shuru karna (Port 3389 ke liye)
