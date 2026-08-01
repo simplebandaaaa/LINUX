@@ -1,9 +1,16 @@
 FROM fedora:latest
 
-# आवश्यक पैकेजेस और XFCE डेस्कटॉप एनवायरनमेंट इंस्टॉल करना (DNF5 Compatible)
+# आवश्यक पैकेजेस, XFCE और xorgxrdp (जो इस एरर को फिक्स करेगा)
 RUN dnf update -y && \
-    dnf install -y @xfce-desktop-environment \
+    dnf install -y \
+    xfce4-session \
+    xfwm4 \
+    xfce4-panel \
+    xfce4-settings \
+    xfce4-terminal \
+    xfdesktop \
     xrdp \
+    xorgxrdp \
     xorg-x11-server-Xorg \
     xorg-x11-xinit \
     dbus-x11 \
@@ -22,7 +29,7 @@ RUN useradd -m -s /bin/bash fedora && \
     usermod -aG wheel fedora && \
     echo "fedora ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# Fedora में रूटलेस Xorg चलाने की परमिशन
+# Xorg परमिशन फिक्स (ताकि X server बिना रूट के स्टार्ट हो सके)
 RUN mkdir -p /etc/X11/ && \
     echo "allowed_users=anybody" > /etc/X11/Xwrapper.config && \
     echo "needs_root_rights=no" >> /etc/X11/Xwrapper.config
@@ -37,7 +44,7 @@ RUN sed -i 's/crypt_level=high/crypt_level=low/' /etc/xrdp/xrdp.ini && \
 # Xorg को डिफ़ॉल्ट सेट करना
 RUN sed -i 's/errorsesman/xrdp\/xorg/g' /etc/xrdp/sesman.ini
 
-# XFCE विज़ुअल एनिमेशन ऑफ करना (ताकि RDP बिल्कुल न अटके)
+# XFCE विज़ुअल एनिमेशन ऑफ करना
 RUN mkdir -p /home/fedora/.config/xfce4/xfconf/xfce-perchannel-xml/ && \
     printf '<?xml version="1.0" encoding="UTF-8"?><channel name="xfwm4" version="1.0"><property name="general" type="empty"><property name="use_compositing" type="bool" value="false"/></property></channel>' > /home/fedora/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
 
