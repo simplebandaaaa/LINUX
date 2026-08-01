@@ -77,9 +77,11 @@ RUN printf 'export XDG_CURRENT_DESKTOP=XFCE\nexport XDG_SESSION_DESKTOP=xfce\nun
     cp /home/ubuntu/.xsession /home/ubuntu/.xsessionrc && \
     chown -R ubuntu:ubuntu /home/ubuntu
 
+# 🛠️ Render Bypass Settings
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
-EXPOSE 3389
+# Render ko khush rakhne ke liye port 10000 expose karein
+EXPOSE 10000
 
 CMD ["/start.sh"]
