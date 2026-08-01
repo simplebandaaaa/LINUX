@@ -11,7 +11,7 @@ mkdir -p /var/run/xrdp
 mkdir -p /var/run/xrdp/sockdir
 chown -R xrdp:xrdp /var/run/xrdp
 
-# किसी भी पुरानी डिस्प्ले लॉक फाइल को डिलीट करें (क्रैश एरर फिक्स करने के लिए)
+# X11 लॉक फाइल्स साफ़ करें
 rm -f /tmp/.X*lock
 rm -rf /tmp/.X11-unix
 mkdir -p /tmp/.X11-unix
