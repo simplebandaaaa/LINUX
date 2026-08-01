@@ -1,7 +1,8 @@
 FROM fedora:latest
 
-# आवश्यक पैकेजेस और XFCE डेस्कटॉप एनवायरनमेंट इंस्टॉल करना
-RUN dnf update -y && dnf groupinstall -y "Xfce" && dnf install -y \
+# आवश्यक पैकेजेस और XFCE डेस्कटॉप एनवायरनमेंट इंस्टॉल करना (DNF5 Compatible)
+RUN dnf update -y && \
+    dnf install -y @xfce-desktop-environment \
     xrdp \
     xorg-x11-server-Xorg \
     xorg-x11-xinit \
@@ -12,11 +13,10 @@ RUN dnf update -y && dnf groupinstall -y "Xfce" && dnf install -y \
     bzip2 \
     ca-certificates \
     wine \
-    firefox \
-    && dnf clean all
+    firefox && \
+    dnf clean all
 
 # ---- 🛠️ SAFE USER SETUP ---- #
-# 'ubuntu' यूज़र की जगह हम 'fedora' यूज़र बना रहे हैं
 RUN useradd -m -s /bin/bash fedora && \
     echo "fedora:fedora" | chpasswd && \
     usermod -aG wheel fedora && \
@@ -46,7 +46,7 @@ RUN mkdir -p /home/fedora/Desktop && \
     printf '[Desktop Entry]\nVersion=1.0\nType=Application\nName=Firefox\nComment=Access the Internet\nExec=firefox\nIcon=firefox\nTerminal=false\nCategories=Network;WebBrowser;\n' > /home/fedora/Desktop/firefox.desktop && \
     chmod +x /home/fedora/Desktop/firefox.desktop
 
-# XFCE एनवायरनमेंट स्क्रिप्ट्स (सेशन स्टार्ट करने के लिए)
+# XFCE एनवायरनमेंट स्क्रिप्ट्स
 RUN printf 'export XDG_CURRENT_DESKTOP=XFCE\nexport XDG_SESSION_DESKTOP=xfce\nunset DBUS_SESSION_BUS_ADDRESS\nunset XDG_RUNTIME_DIR\nstartxfce4\n' > /home/fedora/.xsession && \
     chmod +x /home/fedora/.xsession && \
     cp /home/fedora/.xsession /home/fedora/.xsessionrc && \
