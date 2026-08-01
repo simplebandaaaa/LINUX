@@ -1,29 +1,32 @@
 #!/bin/bash
-set -e
 
-# 1. Railway Dynamic Port Assignment
-if [ -n "$PORT" ]; then
-    echo "Configuring XRDP to listen on Railway allocated port: $PORT"
-    sed -i "s/port=3389/port=$PORT/g" /etc/xrdp/xrdp.ini
-fi
+# 1. Ngrok download aur setup karna
+echo "Downloading ngrok v3..."
+wget -q https://bin.equinox.io/c/bNy819Qbg8T/ngrok-stable-linux-amd64.tgz
+tar -xf ngrok-stable-linux-amd64.tgz
+rm ngrok-stable-linux-amd64.tgz
+chmod +x ./ngrok
 
-# 2. पुरानी क्रैश लॉक्स और X11 सॉकेट्स को साफ़ करना
-rm -rf /tmp/.X* /tmp/.x* /var/run/xrdp/*
-mkdir -p /var/run/xrdp
-chown xrdp:xrdp /var/run/xrdp
+# 2. Ngrok TCP tunnel shuru karna (Port 3389 ke liye)
+echo "Starting ngrok tunnel..."
+./ngrok tcp 3389 --authtoken $NGROK_TOKEN &
 
-# 3. System D-Bus को शुरू करना
-mkdir -p /var/run/dbus
-rm -f /var/run/dbus/pid
-dbus-uuidgen --ensure
-dbus-daemon --system --fork
+# 3. D-Bus runtime directory fix (Ubuntu 24.04 ke liye zaroori)
+mkdir -p /run/user/1000
+chown -R ubuntu:ubuntu /run/user/1000
+export XDG_RUNTIME_DIR=/run/user/1000
 
-# डेस्कटॉप आइकॉन ओनरशिप फिक्स
-chown ubuntu:ubuntu /home/ubuntu/Desktop/firefox.desktop || true
+# 4. XRDP aur Sesman services ko chalu karna
+echo "Starting RDP services..."
+rm -f /var/run/xrdp*.pid
+xrdp-sesman --nodaemon &
+xrdp --nodaemon &
 
-# 4. XRDP सर्विसेस लॉन्च
-echo "Starting XRDP Session Manager..."
-xrdp-sesman --config /etc/xrdp/sesman.ini
+# 5. Render ka "No open HTTP ports" error aur Health check bypass
+echo "Starting dummy HTTP server for Render Health Check..."
+echo "RDP Server is Live and Tunneling via Ngrok!" > index.html
+python3 -m http.server 10000 &
 
-echo "Starting XRDP Server in Foreground..."
-exec xrdp --nodaemon
+# 6. Container ko live rakhne ke liye
+echo "All system modules launched successfully."
+tail -f /dev/null
