@@ -1,27 +1,26 @@
 #!/bin/bash
+set -e
 
-# D-Bus को स्टार्ट करें
-if [ ! -d /var/run/dbus ]; then
-    mkdir -p /var/run/dbus
+# 1. Railway Dynamic Port Assignment
+if [ -n "$PORT" ]; then
+    echo "Configuring XRDP to listen on Railway allocated port: $PORT"
+    sed -i "s/port=3389/port=$PORT/g" /etc/xrdp/xrdp.ini
 fi
+
+# 2. पुरानी क्रैश लॉक्स और X11 सॉकेट्स को साफ़ करना
+rm -rf /tmp/.X* /tmp/.x* /var/run/xrdp/*
+mkdir -p /var/run/xrdp
+chown xrdp:xrdp /var/run/xrdp
+
+# 3. System D-Bus को बैकग्राउंड में शुरू करना
+mkdir -p /var/run/dbus
+rm -f /var/run/dbus/pid
+dbus-uuidgen --ensure
 dbus-daemon --system --fork
 
-# XRDP के लिए डायरेक्टरीज़ और परमिशन सेट करें
-mkdir -p /var/run/xrdp
-mkdir -p /var/run/xrdp/sockdir
-chown -R xrdp:xrdp /var/run/xrdp
+# 4. XRDP सर्विसेस को लॉन्च करना
+echo "Starting XRDP Session Manager..."
+xrdp-sesman --config /etc/xrdp/sesman.ini
 
-# X11 लॉक फाइल्स साफ़ करें
-rm -f /tmp/.X*lock
-rm -rf /tmp/.X11-unix
-mkdir -p /tmp/.X11-unix
-chmod 1777 /tmp/.X11-unix
-
-# जनरेट करें RDP कीज़
-if [ ! -f /etc/xrdp/rsakeys.ini ]; then
-    xrdp-keygen xrdp /etc/xrdp/rsakeys.ini
-fi
-
-# सर्विसेज चालू करें
-xrdp-sesman --nodaemon &
+echo "Starting XRDP Server in Foreground..."
 exec xrdp --nodaemon
