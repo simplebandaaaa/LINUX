@@ -11,12 +11,6 @@ mkdir -p /var/run/xrdp
 mkdir -p /var/run/xrdp/sockdir
 chown -R xrdp:xrdp /var/run/xrdp
 
-# X11/Xorg के पुराने लॉग्स और लॉक फाइल्स साफ़ करें ताकि कोई कॉन्फ्लिक्ट न हो
-rm -f /tmp/.X*lock
-rm -rf /tmp/.X11-unix
-mkdir -p /tmp/.X11-unix
-chmod 1777 /tmp/.X11-unix
-
 # जनरेट करें RDP कीज़
 if [ ! -f /etc/xrdp/rsakeys.ini ]; then
     xrdp-keygen xrdp /etc/xrdp/rsakeys.ini
