@@ -1,6 +1,6 @@
 FROM alpine:latest
 
-# आवश्यक लाइटवेट पैकेजेस, XFCE4, XRDP और Firefox इंस्टॉल करना
+# आवश्यक लाइटवेट पैकेजेस, XFCE4, XRDP और Firefox
 RUN apk update && apk add --no-cache \
     xfce4 \
     xfce4-terminal \
@@ -28,8 +28,9 @@ RUN sed -i 's/crypt_level=high/crypt_level=low/' /etc/xrdp/xrdp.ini && \
     sed -i 's/use_compression=yes/use_compression=yes/' /etc/xrdp/xrdp.ini && \
     sed -i 's/#tcp_send_buffer_size=32768/tcp_send_buffer_size=131072/' /etc/xrdp/xrdp.ini
 
-# Xorg/Xvfb सेटिंग्स (Alpine के लिए बेस्ट)
-RUN sed -i 's/errorsesman/xrdp\/xvfb/g' /etc/xrdp/sesman.ini
+# 🛠️ HARD FIX FOR ALPINE XVFB: sesman.ini को Xvfb के लिए कॉन्फ़िगर करना
+RUN sed -i 's/errorsesman/xrdp\/xvfb/g' /etc/xrdp/sesman.ini && \
+    sed -i 's/param=Xvfb/param=\/usr\/bin\/Xvfb/g' /etc/xrdp/sesman.ini
 
 # XFCE विज़ुअल एनिमेशन ऑफ करना
 RUN mkdir -p /home/alpine/.config/xfce4/xfconf/xfce-perchannel-xml/ && \
