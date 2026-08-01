@@ -1,32 +1,21 @@
 #!/bin/bash
 
-# 1. Ngrok download aur setup karna (Fixed v3 Link)
-echo "Downloading ngrok v3..."
-wget -q https://bin.equinox.io/c/bNy819Qbg8T/ngrok-v3-stable-linux-amd64.tgz
-tar -xf ngrok-v3-stable-linux-amd64.tgz
-rm ngrok-v3-stable-linux-amd64.tgz
-chmod +x ./ngrok
+# D-Bus को स्टार्ट करें
+if [ ! -d /var/run/dbus ]; then
+    mkdir -p /var/run/dbus
+fi
+dbus-daemon --system --fork
 
-# 2. Ngrok TCP tunnel shuru karna (Port 3389 ke liye)
-echo "Starting ngrok tunnel..."
-./ngrok tcp 3389 --authtoken $NGROK_TOKEN &
+# XRDP के लिए डायरेक्टरीज़ और परमिशन सेट करें
+mkdir -p /var/run/xrdp
+mkdir -p /var/run/xrdp/sockdir
+chown -R xrdp:xrdp /var/run/xrdp
 
-# 3. D-Bus runtime directory fix (Ubuntu 24.04 ke liye zaroori)
-mkdir -p /run/user/1000
-chown -R ubuntu:ubuntu /run/user/1000
-export XDG_RUNTIME_DIR=/run/user/1000
+# जनरेट करें RDP कीज़ (अगर पहले से मौजूद नहीं हैं)
+if [ ! -f /etc/xrdp/rsakeys.ini ]; then
+    xrdp-keygen xrdp /etc/xrdp/rsakeys.ini
+fi
 
-# 4. XRDP aur Sesman services ko chalu karna
-echo "Starting RDP services..."
-rm -f /var/run/xrdp*.pid
+# सर्विसेज चालू करें
 xrdp-sesman --nodaemon &
-xrdp --nodaemon &
-
-# 5. Render ka "No open HTTP ports" error aur Health check bypass
-echo "Starting dummy HTTP server for Render Health Check..."
-echo "RDP Server is Live and Tunneling via Ngrok!" > index.html
-python3 -m http.server 10000 &
-
-# 6. Container ko live rakhne ke liye
-echo "All system modules launched successfully."
-tail -f /dev/null
+exec xrdp --nodaemon
