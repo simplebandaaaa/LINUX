@@ -1,83 +1,64 @@
-FROM ubuntu:24.04
+FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Multi-arch support block for Wine32
 RUN dpkg --add-architecture i386
 
-# आवश्यक पैकेजेस (डिफ़ॉल्ट उबंटू बेस पैकेजेस)
+# Firefox के लिए Mozilla PPA जोड़ना (Snap से बचने के लिए)
+RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common gnupg2 && \
+    add-apt-repository -y ppa:mozillateam/ppa && \
+    printf 'Package: firefox*\nPin: release o=LP-PPA-mozillateam\nPin-Priority: 1001\n' > /etc/apt/preferences.d/mozilla-firefox
+
+# Update and install packages (dbus-user-session को यहाँ जोड़ा गया है)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xrdp \
     xorgxrdp \
-    xserver-xorg-core \
     xfce4 \
-    xfce4-panel \
-    xfwm4 \
-    xfce4-settings \
-    xfce4-session \
-    xfce4-terminal \
+    xfce4-goodies \
+    xorg \
     dbus-x11 \
     dbus-user-session \
     sudo \
-    wget \
     curl \
-    bzip2 \
-    ca-certificates \
+    wget \
+    nano \
+    net-tools \
     ssl-cert \
+    polkitd \
+    pulseaudio \
+    pulseaudio-utils \
     wine \
     wine32:i386 \
-    libnss3 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libdbus-1-3 \
-    libgtk-3-0 \
-    libx11-xcb1 \
-    libasound2t64 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    firefox && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# 🚨 OFFICIAL MOZILLA FIREFOX DEPLOYMENT 🚨
-# यह सीधा मोज़िला के सर्ver से स्टेबल लिनक्स बाइनरी उठाएगा
-RUN mkdir -p /opt && \
-    curl -Lo /tmp/firefox.tar.bz2 "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US" && \
-    tar -jxvf /tmp/firefox.tar.bz2 -C /opt/ && \
-    ln -s /opt/firefox/firefox /usr/local/bin/firefox && \
-    rm /tmp/firefox.tar.bz2
-
-# ---- 🛠️ SAFE USER SETUP ---- #
+# ---- 🛠️ USER SETUP FIX ---- #
 RUN echo "ubuntu:ubuntu" | chpasswd && \
     usermod -aG sudo ubuntu && \
     echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+# ---------------------------- #
 
-# Ubuntu 24.04 में रूटलेस Xorg चलाने की परमिशन
+# Configure Xwrapper
 RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config && \
     echo "needs_root_rights=no" >> /etc/X11/Xwrapper.config
 
-# ⚡ SUPER SMOOTH & LOW LATENCY XRDP SETTINGS ⚡
+# Generate machine-id for dbus
+RUN mkdir -p /var/run/dbus && dbus-uuidgen > /var/lib/dbus/machine-id
+
+# Optimize XRDP Configuration
 RUN sed -i 's/crypt_level=high/crypt_level=low/' /etc/xrdp/xrdp.ini && \
     sed -i 's/security_layer=negotiate/security_layer=rdp/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/max_bpp=32/max_bpp=16/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/use_compression=yes/use_compression=yes/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/#tcp_send_buffer_size=32768/tcp_send_buffer_size=131072/' /etc/xrdp/xrdp.ini && \
-    adduser xrdp ssl-cert
+    sed -i 's/max_bpp=32/max_bpp=24/' /etc/xrdp/xrdp.ini
 
-# Xorg डिफ़ॉल्ट सेट करना
-RUN sed -i 's/errorsesman/xrdp\/xorg/g' /etc/xrdp/sesman.ini
-
-# XFCE विज़ुअल एनिमेशन ऑफ करना
-RUN mkdir -p /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/ && \
-    printf '<?xml version="1.0" encoding="UTF-8"?><channel name="xfwm4" version="1.0"><property name="general" type="empty"><property name="use_compositing" type="bool" value="false"/></property></channel>' > /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
-
-# XFCE डेस्कटॉप पर डायरेक्ट Browser का शॉर्टकट आइकॉन बनाना
-RUN mkdir -p /home/ubuntu/Desktop && \
-    printf '[Desktop Entry]\nVersion=1.0\nType=Application\nName=Firefox\nComment=Access the Internet\nExec=firefox --no-sandbox\nIcon=firefox\nTerminal=false\nCategories=Network;WebBrowser;\n' > /home/ubuntu/Desktop/firefox.desktop && \
-    chmod +x /home/ubuntu/Desktop/firefox.desktop
-
-# XFCE एनवायरनमेंट स्क्रिप्ट्स
-RUN printf 'export XDG_CURRENT_DESKTOP=XFCE\nexport XDG_SESSION_DESKTOP=xfce\nunset DBUS_SESSION_BUS_ADDRESS\nunset XDG_RUNTIME_DIR\nstartxfce4\n' > /home/ubuntu/.xsession && \
-    chmod +x /home/ubuntu/.xsession && \
-    cp /home/ubuntu/.xsession /home/ubuntu/.xsessionrc && \
+# Ensure XFCE starts safely for the user (Black Screen को हमेशा के लिए फिक्स करने के लिए बदलाव)
+RUN mkdir -p /home/ubuntu && \
+    printf 'unset DBUS_SESSION_BUS_ADDRESS\nunset XDG_RUNTIME_DIR\nexport XDG_SESSION_TYPE=x11\nxfce4-session\n' > /home/ubuntu/.xsession && \
     chown -R ubuntu:ubuntu /home/ubuntu
+
+# Add xrdp user to ssl-cert group
+RUN adduser xrdp ssl-cert
 
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
