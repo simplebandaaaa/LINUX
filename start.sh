@@ -1,26 +1,23 @@
 #!/bin/bash
-set -e
 
-# 1. Railway Dynamic Port Assignment
-if [ -n "$PORT" ]; then
-    echo "Configuring XRDP to listen on Railway allocated port: $PORT"
-    sed -i "s/port=3389/port=$PORT/g" /etc/xrdp/xrdp.ini
-fi
-
-# 2. पुरानी क्रैश लॉक्स और X11 सॉकेट्स को साफ़ करना
-rm -rf /tmp/.X* /tmp/.x* /var/run/xrdp/*
+# XRDP के लिए ज़रूरी रनटाइम डायरेक्टरी बनाना
 mkdir -p /var/run/xrdp
-chown xrdp:xrdp /var/run/xrdp
-
-# 3. System D-Bus को बैकग्राउंड में शुरू करना
 mkdir -p /var/run/dbus
-rm -f /var/run/dbus/pid
+
+# किसी भी पुराने बचे हुए सॉकेट या PID फाइलों को डिलीट करना
+rm -f /var/run/xrdp/xrdp.pid
+rm -f /var/run/xrdp/xrdp-sesman.pid
+rm -f /var/run/xrdp/xrdp_sesman.socket
+
+# D-Bus और मशीन आईडी को सही से कॉन्फ़िगर और स्टार्ट करना
 dbus-uuidgen --ensure
 dbus-daemon --system --fork
 
-# 4. XRDP सर्विसेस को लॉन्च करना
-echo "Starting XRDP Session Manager..."
-xrdp-sesman --config /etc/xrdp/sesman.ini
+# XRDP सेशन मैनेजर (sesman) को बैकग्राउंड में स्टार्ट करना
+xrdp-sesman --nodaemon &
 
-echo "Starting XRDP Server in Foreground..."
+# थोड़ा रुकना ताकि sesman पूरी तरह एक्टिव हो जाए
+sleep 2
+
+# मुख्य XRDP सर्वर को फोरग्राउंड में चलाना
 exec xrdp --nodaemon
