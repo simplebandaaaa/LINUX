@@ -5,7 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Multi-arch support block for 32-bit apps/Wine
 RUN dpkg --add-architecture i386
 
-# आवश्यक पैकेजेस (Ubuntu 24.04 Compatible)
+# 1. आवश्यक पैकेजेस + Compression Tools (bzip2, xz-utils) को पहले इंस्टॉल करें
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xrdp \
     xorgxrdp \
@@ -22,6 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     curl \
     bzip2 \
+    xz-utils \
+    tar \
     ca-certificates \
     ssl-cert \
     wine \
@@ -39,10 +41,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 🚨 OFFICIAL MOZILLA FIREFOX DEPLOYMENT (Fixed Download Pipeline) 🚨
+# 🚨 OFFICIAL MOZILLA FIREFOX DEPLOYMENT 🚨
+# tar auto-detect (-x) फ़्लैग का इस्तेमाल ताकि bzip2/xz दोनों हैंडल हो सकें
 RUN mkdir -p /opt && \
-    curl -LfsS "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US" | tar -jx -C /opt/ && \
-    ln -sf /opt/firefox/firefox /usr/local/bin/firefox
+    curl -L "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US" -o /tmp/firefox.tar.bz2 && \
+    tar -xf /tmp/firefox.tar.bz2 -C /opt/ && \
+    ln -sf /opt/firefox/firefox /usr/local/bin/firefox && \
+    rm -f /tmp/firefox.tar.bz2
 
 # ---- 🛠️ SAFE USER SETUP ---- #
 RUN echo "ubuntu:ubuntu" | chpasswd && \
