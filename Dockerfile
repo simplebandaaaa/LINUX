@@ -1,68 +1,224 @@
-FROM ubuntu:24.04
+FROM debian:bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
 
-# Multi-arch support block for Wine32
+# ============================================================
+# 32-BIT SUPPORT FOR WINE
+# ============================================================
+
 RUN dpkg --add-architecture i386
 
-# Firefox के लिए Mozilla PPA जोड़ना (Snap से बचने के लिए)
-RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common gnupg2 && \
-    add-apt-repository -y ppa:mozillateam/ppa && \
-    printf 'Package: firefox*\nPin: release o=LP-PPA-mozillateam\nPin-Priority: 1001\n' > /etc/apt/preferences.d/mozilla-firefox
+# ============================================================
+# ULTRA LIGHT DESKTOP
+# XRDP + XORG + ICEWM + ROX
+# WINE32 + BASIC TOOLS
+# ============================================================
 
-# Update and install packages (dbus-user-session को यहाँ जोड़ा गया है)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xrdp \
     xorgxrdp \
-    xfce4 \
-    xfce4-goodies \
-    xorg \
+    xserver-xorg-core \
+    icewm \
+    icewm-themes \
+    rox-filer \
+    xterm \
     dbus-x11 \
     dbus-user-session \
     sudo \
+    ca-certificates \
     curl \
     wget \
-    nano \
-    net-tools \
-    ssl-cert \
-    polkitd \
-    pulseaudio \
-    pulseaudio-utils \
+    bzip2 \
+    unzip \
+    p7zip-full \
     wine \
     wine32:i386 \
-    firefox && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    libnss3 \
+    libgtk-3-0 \
+    libx11-xcb1 \
+    libasound2 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# ---- 🛠️ USER SETUP FIX ---- #
-RUN echo "ubuntu:ubuntu" | chpasswd && \
+# ============================================================
+# USER
+# ============================================================
+
+RUN useradd \
+        -m \
+        -s /bin/bash \
+        ubuntu && \
+    echo "ubuntu:ubuntu" | chpasswd && \
     usermod -aG sudo ubuntu && \
-    echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
-# ---------------------------- #
+    echo "ubuntu ALL=(ALL) NOPASSWD:ALL" \
+        > /etc/sudoers.d/ubuntu && \
+    chmod 0440 /etc/sudoers.d/ubuntu
 
-# Configure Xwrapper
-RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config && \
-    echo "needs_root_rights=no" >> /etc/X11/Xwrapper.config
+# ============================================================
+# XORG
+# ============================================================
 
-# Generate machine-id for dbus
-RUN mkdir -p /var/run/dbus && dbus-uuidgen > /var/lib/dbus/machine-id
+RUN mkdir -p /etc/X11 && \
+    printf '%s\n' \
+    'allowed_users=anybody' \
+    'needs_root_rights=no' \
+    > /etc/X11/Xwrapper.config
 
-# Optimize XRDP Configuration
-RUN sed -i 's/crypt_level=high/crypt_level=low/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/security_layer=negotiate/security_layer=rdp/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/max_bpp=32/max_bpp=24/' /etc/xrdp/xrdp.ini
+# ============================================================
+# XRDP
+# ============================================================
 
-# Ensure XFCE starts safely for the user (Black Screen को हमेशा के लिए फिक्स करने के लिए बदलाव)
-RUN mkdir -p /home/ubuntu && \
-    printf 'unset DBUS_SESSION_BUS_ADDRESS\nunset XDG_RUNTIME_DIR\nexport XDG_SESSION_TYPE=x11\nxfce4-session\n' > /home/ubuntu/.xsession && \
+RUN adduser xrdp ssl-cert || true
+
+# Reduce RDP color depth
+RUN sed -i \
+    's/^max_bpp=.*/max_bpp=16/' \
+    /etc/xrdp/xrdp.ini || true
+
+# ============================================================
+# ICEWM SESSION
+# ============================================================
+
+RUN printf '%s\n' \
+    '#!/bin/sh' \
+    'export XDG_CURRENT_DESKTOP=IceWM' \
+    'export XDG_SESSION_DESKTOP=icewm' \
+    'export XDG_SESSION_TYPE=x11' \
+    'unset DBUS_SESSION_BUS_ADDRESS' \
+    'unset XDG_RUNTIME_DIR' \
+    'exec icewm-session' \
+    > /home/ubuntu/.xsession && \
+    chmod +x /home/ubuntu/.xsession
+
+# ============================================================
+# ICEWM LOW-RAM SETTINGS
+# ============================================================
+
+RUN mkdir -p /home/ubuntu/.icewm && \
+    printf '%s\n' \
+    'TaskBarShowClock=1' \
+    'TaskBarShowWindowListMenu=1' \
+    'TaskBarShowWorkspaces=0' \
+    'ShowDesktop=1' \
+    'FocusOnAppRaise=1' \
+    'QuickSwitch=0' \
+    > /home/ubuntu/.icewm/preferences
+
+# ============================================================
+# ICEWM MENU
+# ============================================================
+
+RUN printf '%s\n' \
+    'menu "Applications" folder {' \
+    '  prog "Firefox" firefox firefox' \
+    '  prog "Files" rox-filer rox-filer' \
+    '  prog "Terminal" xterm xterm' \
+    '}' \
+    > /home/ubuntu/.icewm/menu
+
+# ============================================================
+# FIREFOX
+# ============================================================
+
+RUN mkdir -p /opt && \
+    curl -L \
+    'https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US' \
+    -o /tmp/firefox.tar.bz2 && \
+    tar -xjf /tmp/firefox.tar.bz2 -C /opt && \
+    ln -sf /opt/firefox/firefox /usr/local/bin/firefox && \
+    rm -f /tmp/firefox.tar.bz2
+
+# ============================================================
+# FIREFOX LOW-RAM POLICIES
+# ============================================================
+
+RUN mkdir -p /opt/firefox/distribution && \
+    printf '%s\n' \
+    '{' \
+    '  "policies": {' \
+    '    "DisableTelemetry": true,' \
+    '    "DisableFirefoxStudies": true,' \
+    '    "DisablePocket": true,' \
+    '    "DisableFirefoxAccounts": true,' \
+    '    "OverrideFirstRunPage": "",' \
+    '    "OverridePostUpdatePage": ""' \
+    '  }' \
+    '}' \
+    > /opt/firefox/distribution/policies.json
+
+# ============================================================
+# FIREFOX DESKTOP ICON
+# ============================================================
+
+RUN mkdir -p /home/ubuntu/Desktop && \
+    printf '%s\n' \
+    '[Desktop Entry]' \
+    'Version=1.0' \
+    'Type=Application' \
+    'Name=Firefox' \
+    'Comment=Web Browser' \
+    'Exec=/usr/local/bin/firefox' \
+    'Icon=firefox' \
+    'Terminal=false' \
+    'Categories=Network;WebBrowser;' \
+    > /home/ubuntu/Desktop/firefox.desktop && \
+    chmod +x /home/ubuntu/Desktop/firefox.desktop
+
+# ============================================================
+# TERMINAL ICON
+# ============================================================
+
+RUN printf '%s\n' \
+    '[Desktop Entry]' \
+    'Version=1.0' \
+    'Type=Application' \
+    'Name=Terminal' \
+    'Exec=xterm' \
+    'Icon=utilities-terminal' \
+    'Terminal=false' \
+    > /home/ubuntu/Desktop/terminal.desktop && \
+    chmod +x /home/ubuntu/Desktop/terminal.desktop
+
+# ============================================================
+# FILE MANAGER ICON
+# ============================================================
+
+RUN printf '%s\n' \
+    '[Desktop Entry]' \
+    'Version=1.0' \
+    'Type=Application' \
+    'Name=Files' \
+    'Exec=rox' \
+    'Icon=folder' \
+    'Terminal=false' \
+    > /home/ubuntu/Desktop/files.desktop && \
+    chmod +x /home/ubuntu/Desktop/files.desktop
+
+# ============================================================
+# WINE DEFAULT DIRECTORY
+# ============================================================
+
+RUN mkdir -p /home/ubuntu/.wine && \
     chown -R ubuntu:ubuntu /home/ubuntu
 
-# Add xrdp user to ssl-cert group
-RUN adduser xrdp ssl-cert
+# ============================================================
+# START SCRIPT
+# ============================================================
 
 COPY start.sh /start.sh
+
 RUN chmod +x /start.sh
 
+# ============================================================
+# RDP PORT
+# ============================================================
+
 EXPOSE 3389
+
+# ============================================================
+# START
+# ============================================================
 
 CMD ["/start.sh"]
