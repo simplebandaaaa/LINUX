@@ -1,19 +1,12 @@
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV LANG=en_US.UTF-8
-ENV LC_ALL=en_US.UTF-8
 
-# ==================================================
-# i386 support - required for Wine32
-# ==================================================
+# Multi-arch support block for 32-bit apps/Wine
 RUN dpkg --add-architecture i386
 
-# ==================================================
-# System packages
-# ==================================================
+# आवश्यक पैकेजेस (Ubuntu 24.04 Compatible)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    locales \
     xrdp \
     xorgxrdp \
     xserver-xorg-core \
@@ -25,17 +18,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xfce4-terminal \
     dbus-x11 \
     dbus-user-session \
-    dbus \
     sudo \
     wget \
     curl \
     bzip2 \
-    xz-utils \
     ca-certificates \
     ssl-cert \
-    file \
     wine \
-    wine32:i386 \
+    wine64 \
     libnss3 \
     libatk1.0-0 \
     libatk-bridge2.0-0 \
@@ -43,123 +33,54 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgtk-3-0 \
     libx11-xcb1 \
     libasound2t64 \
-    && locale-gen en_US.UTF-8 \
+    libdbus-glib-1-2 \
+    libcanberra-gtk3-module \
+    ffmpeg \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# ==================================================
-# Firefox - official Mozilla Linux x86_64 build
-# ==================================================
-RUN set -eux; \
-    mkdir -p /opt; \
-    curl -fL \
-        "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US" \
-        -o /tmp/firefox.tar.xz; \
-    file /tmp/firefox.tar.xz; \
-    tar -xJf /tmp/firefox.tar.xz -C /opt; \
-    test -x /opt/firefox/firefox; \
-    ln -sf /opt/firefox/firefox /usr/local/bin/firefox; \
-    rm -f /tmp/firefox.tar.xz
+# 🚨 OFFICIAL MOZILLA FIREFOX DEPLOYMENT 🚨
+RUN mkdir -p /opt && \
+    curl -Lo /tmp/firefox.tar.bz2 "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US" && \
+    tar -jxvf /tmp/firefox.tar.bz2 -C /opt/ && \
+    ln -sf /opt/firefox/firefox /usr/local/bin/firefox && \
+    rm /tmp/firefox.tar.bz2
 
-# ==================================================
-# Ubuntu user
-# ==================================================
-RUN useradd -m -s /bin/bash ubuntu \
-    && echo "ubuntu:ubuntu" | chpasswd \
-    && usermod -aG sudo,ssl-cert ubuntu \
-    && echo "ubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ubuntu \
-    && chmod 0440 /etc/sudoers.d/ubuntu
+# ---- 🛠️ SAFE USER SETUP ---- #
+RUN echo "ubuntu:ubuntu" | chpasswd && \
+    usermod -aG sudo ubuntu && \
+    echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# ==================================================
-# XRDP permissions
-# ==================================================
-RUN adduser xrdp ssl-cert || true
+# Ubuntu 24.04 में Rootless Xorg परमिशन
+RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config && \
+    echo "needs_root_rights=no" >> /etc/X11/Xwrapper.config
 
-# ==================================================
-# Xorg configuration
-# ==================================================
-RUN mkdir -p /etc/X11 \
-    && printf '%s\n' \
-       'allowed_users=anybody' \
-       'needs_root_rights=no' \
-       > /etc/X11/Xwrapper.config
+# ⚡ SUPER SMOOTH & LOW LATENCY XRDP SETTINGS ⚡
+RUN sed -i 's/crypt_level=high/crypt_level=low/' /etc/xrdp/xrdp.ini && \
+    sed -i 's/security_layer=negotiate/security_layer=rdp/' /etc/xrdp/xrdp.ini && \
+    sed -i 's/max_bpp=32/max_bpp=16/' /etc/xrdp/xrdp.ini && \
+    sed -i 's/use_compression=yes/use_compression=yes/' /etc/xrdp/xrdp.ini && \
+    sed -i 's/#tcp_send_buffer_size=32768/tcp_send_buffer_size=131072/' /etc/xrdp/xrdp.ini && \
+    adduser xrdp ssl-cert
 
-# ==================================================
-# XRDP configuration
-# ==================================================
-RUN sed -i -E \
-        's/^[[:space:]]*crypt_level=.*/crypt_level=low/' \
-        /etc/xrdp/xrdp.ini \
-    && sed -i -E \
-        's/^[[:space:]]*security_layer=.*/security_layer=rdp/' \
-        /etc/xrdp/xrdp.ini \
-    && sed -i -E \
-        's/^[[:space:]]*max_bpp=.*/max_bpp=16/' \
-        /etc/xrdp/xrdp.ini
+# Xorg डिफ़ॉल्ट सेट करना
+RUN sed -i 's/errorsesman/xrdp\/xorg/g' /etc/xrdp/sesman.ini
 
-# ==================================================
-# Disable XFCE compositor
-# ==================================================
-RUN mkdir -p \
-        /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml \
-    && cat > /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml <<'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
+# XFCE सेटिंग्स और डेस्कटॉप आइकॉन कॉन्फ़िगरेशन
+RUN mkdir -p /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/ /home/ubuntu/Desktop && \
+    printf '<?xml "1.0" encoding="UTF-8"?><channel name="xfwm4" version="1.0"><property name="general" type="empty"><property name="use_compositing" type="bool" value="false"/></property></channel>' > /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml && \
+    printf '[Desktop Entry]\nVersion=1.0\nType=Application\nName=Firefox\nComment=Access the Internet\nExec=firefox --no-sandbox\nIcon=/opt/firefox/browser/chrome/icons/default/default128.png\nTerminal=false\nCategories=Network;WebBrowser;\n' > /home/ubuntu/Desktop/firefox.desktop && \
+    chmod +x /home/ubuntu/Desktop/firefox.desktop
 
-<channel name="xfwm4" version="1.0">
-  <property name="general" type="empty">
-    <property name="use_compositing" type="bool" value="false"/>
-  </property>
-</channel>
-EOF
+# XFCE Session स्क्रिप्ट्स
+RUN printf 'export XDG_CURRENT_DESKTOP=XFCE\nexport XDG_SESSION_DESKTOP=xfce\nunset DBUS_SESSION_BUS_ADDRESS\nunset XDG_RUNTIME_DIR\nstartxfce4\n' > /home/ubuntu/.xsession && \
+    chmod +x /home/ubuntu/.xsession && \
+    cp /home/ubuntu/.xsession /home/ubuntu/.xsessionrc && \
+    chown -R ubuntu:ubuntu /home/ubuntu
 
-# ==================================================
-# XFCE XRDP session
-# ==================================================
-RUN cat > /home/ubuntu/.xsession <<'EOF'
-#!/bin/sh
-
-export XDG_CURRENT_DESKTOP=XFCE
-export XDG_SESSION_DESKTOP=xfce
-export XDG_CONFIG_DIRS=/etc/xdg/xdg-xfce:/etc/xdg
-export XDG_DATA_DIRS=/usr/share/xfce4:/usr/local/share:/usr/share
-
-unset DBUS_SESSION_BUS_ADDRESS
-
-exec startxfce4
-EOF
-
-RUN chmod +x /home/ubuntu/.xsession \
-    && cp /home/ubuntu/.xsession /home/ubuntu/.xsessionrc
-
-# ==================================================
-# Firefox desktop shortcut
-# ==================================================
-RUN mkdir -p /home/ubuntu/Desktop \
-    && cat > /home/ubuntu/Desktop/firefox.desktop <<'EOF'
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=Firefox
-Comment=Web Browser
-Exec=/usr/local/bin/firefox
-Icon=/opt/firefox/browser/chrome/icons/default/default128.png
-Terminal=false
-Categories=Network;WebBrowser;
-EOF
-
-RUN chmod +x /home/ubuntu/Desktop/firefox.desktop \
-    && chown -R ubuntu:ubuntu /home/ubuntu
-
-# ==================================================
-# Startup script
-# ==================================================
 COPY start.sh /start.sh
-
 RUN chmod +x /start.sh
 
-# ==================================================
-# Railway
-# ==================================================
 EXPOSE 3389
 
 CMD ["/start.sh"]
