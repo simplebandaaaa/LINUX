@@ -4,14 +4,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 
-# --------------------------------------------------
-# i386 support for Wine32
-# --------------------------------------------------
+# ==================================================
+# i386 support - required for Wine32
+# ==================================================
 RUN dpkg --add-architecture i386
 
-# --------------------------------------------------
-# Base packages
-# --------------------------------------------------
+# ==================================================
+# System packages
+# ==================================================
 RUN apt-get update && apt-get install -y --no-install-recommends \
     locales \
     xrdp \
@@ -25,12 +25,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xfce4-terminal \
     dbus-x11 \
     dbus-user-session \
+    dbus \
     sudo \
     wget \
     curl \
     bzip2 \
+    xz-utils \
     ca-certificates \
     ssl-cert \
+    file \
     wine \
     wine32:i386 \
     libnss3 \
@@ -44,52 +47,59 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# --------------------------------------------------
-# Firefox - official Mozilla binary
-# --------------------------------------------------
-RUN mkdir -p /opt/firefox \
-    && curl -fL \
-       "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US" \
-       -o /tmp/firefox.tar.bz2 \
-    && tar -xjf /tmp/firefox.tar.bz2 -C /opt \
-    && ln -sf /opt/firefox/firefox /usr/local/bin/firefox \
-    && rm -f /tmp/firefox.tar.bz2
+# ==================================================
+# Firefox - official Mozilla Linux x86_64 build
+# ==================================================
+RUN set -eux; \
+    mkdir -p /opt; \
+    curl -fL \
+        "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US" \
+        -o /tmp/firefox.tar.xz; \
+    file /tmp/firefox.tar.xz; \
+    tar -xJf /tmp/firefox.tar.xz -C /opt; \
+    test -x /opt/firefox/firefox; \
+    ln -sf /opt/firefox/firefox /usr/local/bin/firefox; \
+    rm -f /tmp/firefox.tar.xz
 
-# --------------------------------------------------
-# User
-# --------------------------------------------------
+# ==================================================
+# Ubuntu user
+# ==================================================
 RUN useradd -m -s /bin/bash ubuntu \
     && echo "ubuntu:ubuntu" | chpasswd \
     && usermod -aG sudo,ssl-cert ubuntu \
     && echo "ubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ubuntu \
     && chmod 0440 /etc/sudoers.d/ubuntu
 
-# --------------------------------------------------
-# XRDP configuration
-# --------------------------------------------------
+# ==================================================
+# XRDP permissions
+# ==================================================
 RUN adduser xrdp ssl-cert || true
 
-# Allow Xorg to run correctly inside the container
+# ==================================================
+# Xorg configuration
+# ==================================================
 RUN mkdir -p /etc/X11 \
     && printf '%s\n' \
        'allowed_users=anybody' \
        'needs_root_rights=no' \
        > /etc/X11/Xwrapper.config
 
-# Lower XRDP overhead
-RUN sed -i \
-        's/^crypt_level=.*/crypt_level=low/' \
+# ==================================================
+# XRDP configuration
+# ==================================================
+RUN sed -i -E \
+        's/^[[:space:]]*crypt_level=.*/crypt_level=low/' \
         /etc/xrdp/xrdp.ini \
-    && sed -i \
-        's/^security_layer=.*/security_layer=rdp/' \
+    && sed -i -E \
+        's/^[[:space:]]*security_layer=.*/security_layer=rdp/' \
         /etc/xrdp/xrdp.ini \
-    && sed -i \
-        's/^max_bpp=.*/max_bpp=16/' \
+    && sed -i -E \
+        's/^[[:space:]]*max_bpp=.*/max_bpp=16/' \
         /etc/xrdp/xrdp.ini
 
-# --------------------------------------------------
-# XFCE session
-# --------------------------------------------------
+# ==================================================
+# Disable XFCE compositor
+# ==================================================
 RUN mkdir -p \
         /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml \
     && cat > /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml <<'EOF'
@@ -102,9 +112,9 @@ RUN mkdir -p \
 </channel>
 EOF
 
-# --------------------------------------------------
-# XRDP session startup
-# --------------------------------------------------
+# ==================================================
+# XFCE XRDP session
+# ==================================================
 RUN cat > /home/ubuntu/.xsession <<'EOF'
 #!/bin/sh
 
@@ -121,9 +131,9 @@ EOF
 RUN chmod +x /home/ubuntu/.xsession \
     && cp /home/ubuntu/.xsession /home/ubuntu/.xsessionrc
 
-# --------------------------------------------------
+# ==================================================
 # Firefox desktop shortcut
-# --------------------------------------------------
+# ==================================================
 RUN mkdir -p /home/ubuntu/Desktop \
     && cat > /home/ubuntu/Desktop/firefox.desktop <<'EOF'
 [Desktop Entry]
@@ -140,12 +150,16 @@ EOF
 RUN chmod +x /home/ubuntu/Desktop/firefox.desktop \
     && chown -R ubuntu:ubuntu /home/ubuntu
 
-# --------------------------------------------------
+# ==================================================
 # Startup script
-# --------------------------------------------------
+# ==================================================
 COPY start.sh /start.sh
+
 RUN chmod +x /start.sh
 
+# ==================================================
+# Railway
+# ==================================================
 EXPOSE 3389
 
 CMD ["/start.sh"]
