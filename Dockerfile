@@ -11,7 +11,7 @@ ENV LC_ALL=C.UTF-8
 RUN dpkg --add-architecture i386
 
 # ============================================================
-# ULTRA LIGHT DESKTOP
+# ULTRA-LIGHT DESKTOP + XRDP + FIREFOX ESR + WINE
 # ============================================================
 
 RUN apt-get update && \
@@ -29,9 +29,9 @@ RUN apt-get update && \
         ca-certificates \
         curl \
         wget \
-        bzip2 \
         unzip \
         p7zip-full \
+        firefox-esr \
         wine \
         wine32:i386 \
         libnss3 \
@@ -66,11 +66,12 @@ RUN mkdir -p /etc/X11 && \
         > /etc/X11/Xwrapper.config
 
 # ============================================================
-# XRDP
+# XRDP CONFIG
 # ============================================================
 
 RUN adduser xrdp ssl-cert || true
 
+# Lower color depth to reduce RDP bandwidth
 RUN sed -i \
     's/^max_bpp=.*/max_bpp=16/' \
     /etc/xrdp/xrdp.ini || true
@@ -84,6 +85,7 @@ RUN printf '%s\n' \
     'export XDG_CURRENT_DESKTOP=IceWM' \
     'export XDG_SESSION_DESKTOP=icewm' \
     'export XDG_SESSION_TYPE=x11' \
+    'export XDG_CONFIG_DIRS=/etc/xdg' \
     'unset DBUS_SESSION_BUS_ADDRESS' \
     'unset XDG_RUNTIME_DIR' \
     'exec icewm-session' \
@@ -91,7 +93,7 @@ RUN printf '%s\n' \
     chmod +x /home/ubuntu/.xsession
 
 # ============================================================
-# ICEWM LOW RAM CONFIG
+# ICEWM LOW-RAM CONFIGURATION
 # ============================================================
 
 RUN mkdir -p /home/ubuntu/.icewm && \
@@ -102,6 +104,7 @@ RUN mkdir -p /home/ubuntu/.icewm && \
         'ShowDesktop=1' \
         'FocusOnAppRaise=1' \
         'QuickSwitch=0' \
+        'ShowMoveSizeStatus=0' \
         > /home/ubuntu/.icewm/preferences
 
 # ============================================================
@@ -110,59 +113,57 @@ RUN mkdir -p /home/ubuntu/.icewm && \
 
 RUN printf '%s\n' \
     'menu "Applications" folder {' \
-    '  prog "Firefox" firefox firefox' \
+    '  prog "Firefox ESR" firefox-esr firefox-esr' \
     '  prog "Files" rox rox' \
     '  prog "Terminal" xterm xterm' \
     '}' \
     > /home/ubuntu/.icewm/menu
 
 # ============================================================
-# FIREFOX
+# FIREFOX ESR - LOW RESOURCE POLICIES
 # ============================================================
 
-RUN mkdir -p /opt && \
-    curl -L \
-        'https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US' \
-        -o /tmp/firefox.tar.bz2 && \
-    tar -xjf /tmp/firefox.tar.bz2 -C /opt && \
-    ln -sf /opt/firefox/firefox /usr/local/bin/firefox && \
-    rm -f /tmp/firefox.tar.bz2
+RUN mkdir -p /etc/firefox-esr/policies
+
+RUN printf '%s\n' \
+    '{' \
+    '  "policies": {' \
+    '    "DisableTelemetry": true,' \
+    '    "DisableFirefoxStudies": true,' \
+    '    "DisablePocket": true,' \
+    '    "DisableFirefoxAccounts": true,' \
+    '    "OverrideFirstRunPage": "",' \
+    '    "OverridePostUpdatePage": ""' \
+    '  }' \
+    '}' \
+    > /etc/firefox-esr/policies/policies.json
 
 # ============================================================
-# FIREFOX POLICIES
-# ============================================================
-
-RUN mkdir -p /opt/firefox/distribution && \
-    printf '%s\n' \
-        '{' \
-        '  "policies": {' \
-        '    "DisableTelemetry": true,' \
-        '    "DisableFirefoxStudies": true,' \
-        '    "DisablePocket": true,' \
-        '    "DisableFirefoxAccounts": true,' \
-        '    "OverrideFirstRunPage": "",' \
-        '    "OverridePostUpdatePage": ""' \
-        '  }' \
-        '}' \
-        > /opt/firefox/distribution/policies.json
-
-# ============================================================
-# DESKTOP SHORTCUTS
+# DESKTOP DIRECTORY
 # ============================================================
 
 RUN mkdir -p /home/ubuntu/Desktop
+
+# ============================================================
+# FIREFOX SHORTCUT
+# ============================================================
 
 RUN printf '%s\n' \
     '[Desktop Entry]' \
     'Version=1.0' \
     'Type=Application' \
-    'Name=Firefox' \
-    'Exec=/usr/local/bin/firefox' \
-    'Icon=firefox' \
+    'Name=Firefox ESR' \
+    'Comment=Web Browser' \
+    'Exec=firefox-esr' \
+    'Icon=firefox-esr' \
     'Terminal=false' \
     'Categories=Network;WebBrowser;' \
     > /home/ubuntu/Desktop/firefox.desktop && \
     chmod +x /home/ubuntu/Desktop/firefox.desktop
+
+# ============================================================
+# TERMINAL SHORTCUT
+# ============================================================
 
 RUN printf '%s\n' \
     '[Desktop Entry]' \
@@ -175,31 +176,13 @@ RUN printf '%s\n' \
     > /home/ubuntu/Desktop/terminal.desktop && \
     chmod +x /home/ubuntu/Desktop/terminal.desktop
 
+# ============================================================
+# FILE MANAGER SHORTCUT
+# ============================================================
+
 RUN printf '%s\n' \
     '[Desktop Entry]' \
     'Version=1.0' \
     'Type=Application' \
     'Name=Files' \
-    'Exec=rox' \
-    'Icon=folder' \
-    'Terminal=false' \
-    > /home/ubuntu/Desktop/files.desktop && \
-    chmod +x /home/ubuntu/Desktop/files.desktop
-
-# ============================================================
-# PERMISSIONS
-# ============================================================
-
-RUN chown -R ubuntu:ubuntu /home/ubuntu
-
-# ============================================================
-# START SCRIPT
-# ============================================================
-
-COPY start.sh /start.sh
-
-RUN chmod +x /start.sh
-
-EXPOSE 3389
-
-CMD ["/start.sh"]
+    'Exec=
