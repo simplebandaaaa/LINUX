@@ -12,33 +12,32 @@ RUN dpkg --add-architecture i386
 
 # ============================================================
 # ULTRA LIGHT DESKTOP
-# XRDP + XORG + ICEWM + ROX
-# WINE32 + BASIC TOOLS
 # ============================================================
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    xrdp \
-    xorgxrdp \
-    xserver-xorg-core \
-    icewm \
-    icewm-themes \
-    rox-filer \
-    xterm \
-    dbus-x11 \
-    dbus-user-session \
-    sudo \
-    ca-certificates \
-    curl \
-    wget \
-    bzip2 \
-    unzip \
-    p7zip-full \
-    wine \
-    wine32:i386 \
-    libnss3 \
-    libgtk-3-0 \
-    libx11-xcb1 \
-    libasound2 \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        xrdp \
+        xorgxrdp \
+        xserver-xorg-core \
+        icewm \
+        icewm-common \
+        rox-filer \
+        xterm \
+        dbus-x11 \
+        dbus-user-session \
+        sudo \
+        ca-certificates \
+        curl \
+        wget \
+        bzip2 \
+        unzip \
+        p7zip-full \
+        wine \
+        wine32:i386 \
+        libnss3 \
+        libgtk-3-0 \
+        libx11-xcb1 \
+        libasound2 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -57,14 +56,14 @@ RUN useradd \
     chmod 0440 /etc/sudoers.d/ubuntu
 
 # ============================================================
-# XORG
+# XORG CONFIG
 # ============================================================
 
 RUN mkdir -p /etc/X11 && \
     printf '%s\n' \
-    'allowed_users=anybody' \
-    'needs_root_rights=no' \
-    > /etc/X11/Xwrapper.config
+        'allowed_users=anybody' \
+        'needs_root_rights=no' \
+        > /etc/X11/Xwrapper.config
 
 # ============================================================
 # XRDP
@@ -72,7 +71,6 @@ RUN mkdir -p /etc/X11 && \
 
 RUN adduser xrdp ssl-cert || true
 
-# Reduce RDP color depth
 RUN sed -i \
     's/^max_bpp=.*/max_bpp=16/' \
     /etc/xrdp/xrdp.ini || true
@@ -93,18 +91,18 @@ RUN printf '%s\n' \
     chmod +x /home/ubuntu/.xsession
 
 # ============================================================
-# ICEWM LOW-RAM SETTINGS
+# ICEWM LOW RAM CONFIG
 # ============================================================
 
 RUN mkdir -p /home/ubuntu/.icewm && \
     printf '%s\n' \
-    'TaskBarShowClock=1' \
-    'TaskBarShowWindowListMenu=1' \
-    'TaskBarShowWorkspaces=0' \
-    'ShowDesktop=1' \
-    'FocusOnAppRaise=1' \
-    'QuickSwitch=0' \
-    > /home/ubuntu/.icewm/preferences
+        'TaskBarShowClock=1' \
+        'TaskBarShowWindowListMenu=1' \
+        'TaskBarShowWorkspaces=0' \
+        'ShowDesktop=1' \
+        'FocusOnAppRaise=1' \
+        'QuickSwitch=0' \
+        > /home/ubuntu/.icewm/preferences
 
 # ============================================================
 # ICEWM MENU
@@ -113,7 +111,7 @@ RUN mkdir -p /home/ubuntu/.icewm && \
 RUN printf '%s\n' \
     'menu "Applications" folder {' \
     '  prog "Firefox" firefox firefox' \
-    '  prog "Files" rox-filer rox-filer' \
+    '  prog "Files" rox rox' \
     '  prog "Terminal" xterm xterm' \
     '}' \
     > /home/ubuntu/.icewm/menu
@@ -124,51 +122,47 @@ RUN printf '%s\n' \
 
 RUN mkdir -p /opt && \
     curl -L \
-    'https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US' \
-    -o /tmp/firefox.tar.bz2 && \
+        'https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US' \
+        -o /tmp/firefox.tar.bz2 && \
     tar -xjf /tmp/firefox.tar.bz2 -C /opt && \
     ln -sf /opt/firefox/firefox /usr/local/bin/firefox && \
     rm -f /tmp/firefox.tar.bz2
 
 # ============================================================
-# FIREFOX LOW-RAM POLICIES
+# FIREFOX POLICIES
 # ============================================================
 
 RUN mkdir -p /opt/firefox/distribution && \
     printf '%s\n' \
-    '{' \
-    '  "policies": {' \
-    '    "DisableTelemetry": true,' \
-    '    "DisableFirefoxStudies": true,' \
-    '    "DisablePocket": true,' \
-    '    "DisableFirefoxAccounts": true,' \
-    '    "OverrideFirstRunPage": "",' \
-    '    "OverridePostUpdatePage": ""' \
-    '  }' \
-    '}' \
-    > /opt/firefox/distribution/policies.json
+        '{' \
+        '  "policies": {' \
+        '    "DisableTelemetry": true,' \
+        '    "DisableFirefoxStudies": true,' \
+        '    "DisablePocket": true,' \
+        '    "DisableFirefoxAccounts": true,' \
+        '    "OverrideFirstRunPage": "",' \
+        '    "OverridePostUpdatePage": ""' \
+        '  }' \
+        '}' \
+        > /opt/firefox/distribution/policies.json
 
 # ============================================================
-# FIREFOX DESKTOP ICON
+# DESKTOP SHORTCUTS
 # ============================================================
 
-RUN mkdir -p /home/ubuntu/Desktop && \
-    printf '%s\n' \
+RUN mkdir -p /home/ubuntu/Desktop
+
+RUN printf '%s\n' \
     '[Desktop Entry]' \
     'Version=1.0' \
     'Type=Application' \
     'Name=Firefox' \
-    'Comment=Web Browser' \
     'Exec=/usr/local/bin/firefox' \
     'Icon=firefox' \
     'Terminal=false' \
     'Categories=Network;WebBrowser;' \
     > /home/ubuntu/Desktop/firefox.desktop && \
     chmod +x /home/ubuntu/Desktop/firefox.desktop
-
-# ============================================================
-# TERMINAL ICON
-# ============================================================
 
 RUN printf '%s\n' \
     '[Desktop Entry]' \
@@ -180,10 +174,6 @@ RUN printf '%s\n' \
     'Terminal=false' \
     > /home/ubuntu/Desktop/terminal.desktop && \
     chmod +x /home/ubuntu/Desktop/terminal.desktop
-
-# ============================================================
-# FILE MANAGER ICON
-# ============================================================
 
 RUN printf '%s\n' \
     '[Desktop Entry]' \
@@ -197,11 +187,10 @@ RUN printf '%s\n' \
     chmod +x /home/ubuntu/Desktop/files.desktop
 
 # ============================================================
-# WINE DEFAULT DIRECTORY
+# PERMISSIONS
 # ============================================================
 
-RUN mkdir -p /home/ubuntu/.wine && \
-    chown -R ubuntu:ubuntu /home/ubuntu
+RUN chown -R ubuntu:ubuntu /home/ubuntu
 
 # ============================================================
 # START SCRIPT
@@ -211,14 +200,6 @@ COPY start.sh /start.sh
 
 RUN chmod +x /start.sh
 
-# ============================================================
-# RDP PORT
-# ============================================================
-
 EXPOSE 3389
-
-# ============================================================
-# START
-# ============================================================
 
 CMD ["/start.sh"]
