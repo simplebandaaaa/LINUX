@@ -1,23 +1,31 @@
 #!/bin/bash
 
-# XRDP के लिए ज़रूरी रनटाइम डायरेक्टरी बनाना
-mkdir -p /var/run/xrdp
-mkdir -p /var/run/dbus
+set -e
 
-# किसी भी पुराने बचे हुए सॉकेट या PID फाइलों को डिलीट करना
-rm -f /var/run/xrdp/xrdp.pid
-rm -f /var/run/xrdp/xrdp-sesman.pid
-rm -f /var/run/xrdp/xrdp_sesman.socket
+# ============================================================
+# RUNTIME DIRECTORIES
+# ============================================================
 
-# D-Bus और मशीन आईडी को सही से कॉन्फ़िगर और स्टार्ट करना
-dbus-uuidgen --ensure
-dbus-daemon --system --fork
+mkdir -p /run/dbus
+mkdir -p /run/xrdp
 
-# XRDP सेशन मैनेजर (sesman) को बैकग्राउंड में स्टार्ट करना
-xrdp-sesman --nodaemon &
+# Remove stale X11 sockets
+rm -rf /tmp/.X11-unix/* 2>/dev/null || true
 
-# थोड़ा रुकना ताकि sesman पूरी तरह एक्टिव हो जाए
-sleep 2
+# ============================================================
+# DBUS
+# ============================================================
 
-# मुख्य XRDP सर्वर को फोरग्राउंड में चलाना
-exec xrdp --nodaemon
+dbus-daemon --system --fork 2>/dev/null || true
+
+# ============================================================
+# XRDP SESSION MANAGER
+# ============================================================
+
+/usr/sbin/xrdp-sesman
+
+# ============================================================
+# START XRDP
+# ============================================================
+
+exec /usr/sbin/xrdp --nodaemon
