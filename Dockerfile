@@ -39,12 +39,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 🚨 OFFICIAL MOZILLA FIREFOX DEPLOYMENT 🚨
+# 🚨 OFFICIAL MOZILLA FIREFOX DEPLOYMENT (Fixed Download Pipeline) 🚨
 RUN mkdir -p /opt && \
-    curl -Lo /tmp/firefox.tar.bz2 "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US" && \
-    tar -jxvf /tmp/firefox.tar.bz2 -C /opt/ && \
-    ln -sf /opt/firefox/firefox /usr/local/bin/firefox && \
-    rm /tmp/firefox.tar.bz2
+    curl -LfsS "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US" | tar -jx -C /opt/ && \
+    ln -sf /opt/firefox/firefox /usr/local/bin/firefox
 
 # ---- 🛠️ SAFE USER SETUP ---- #
 RUN echo "ubuntu:ubuntu" | chpasswd && \
@@ -66,13 +64,13 @@ RUN sed -i 's/crypt_level=high/crypt_level=low/' /etc/xrdp/xrdp.ini && \
 # Xorg डिफ़ॉल्ट सेट करना
 RUN sed -i 's/errorsesman/xrdp\/xorg/g' /etc/xrdp/sesman.ini
 
-# XFCE सेटिंग्स और डेस्कटॉप आइकॉन कॉन्फ़िगरेशन
+# XFCE विज़ुअल एनिमेशन ऑफ और Firefox डेस्कटॉप आइकॉन
 RUN mkdir -p /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/ /home/ubuntu/Desktop && \
-    printf '<?xml "1.0" encoding="UTF-8"?><channel name="xfwm4" version="1.0"><property name="general" type="empty"><property name="use_compositing" type="bool" value="false"/></property></channel>' > /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml && \
+    printf '<?xml version="1.0" encoding="UTF-8"?><channel name="xfwm4" version="1.0"><property name="general" type="empty"><property name="use_compositing" type="bool" value="false"/></property></channel>' > /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml && \
     printf '[Desktop Entry]\nVersion=1.0\nType=Application\nName=Firefox\nComment=Access the Internet\nExec=firefox --no-sandbox\nIcon=/opt/firefox/browser/chrome/icons/default/default128.png\nTerminal=false\nCategories=Network;WebBrowser;\n' > /home/ubuntu/Desktop/firefox.desktop && \
     chmod +x /home/ubuntu/Desktop/firefox.desktop
 
-# XFCE Session स्क्रिप्ट्स
+# XFCE एनवायरनमेंट स्क्रिप्ट्स और सही Permissions
 RUN printf 'export XDG_CURRENT_DESKTOP=XFCE\nexport XDG_SESSION_DESKTOP=xfce\nunset DBUS_SESSION_BUS_ADDRESS\nunset XDG_RUNTIME_DIR\nstartxfce4\n' > /home/ubuntu/.xsession && \
     chmod +x /home/ubuntu/.xsession && \
     cp /home/ubuntu/.xsession /home/ubuntu/.xsessionrc && \
