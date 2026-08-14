@@ -1,11 +1,12 @@
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV HOME=/root
+ENV USER=root
 
-# Multi-arch support block for 32-bit apps/Wine
-RUN dpkg --add-architecture i386
-
-# 1. आवश्यक पैकेजेस + Compression Tools (bzip2, xz-utils) को पहले इंस्टॉल करें
+# -------------------------------
+# Base packages
+# -------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xrdp \
     xorgxrdp \
@@ -22,68 +23,144 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     curl \
     bzip2 \
-    xz-utils \
-    tar \
     ca-certificates \
     ssl-cert \
-    wine \
-    wine64 \
-    libnss3 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libdbus-1-3 \
-    libgtk-3-0 \
-    libx11-xcb1 \
-    libasound2t64 \
-    libdbus-glib-1-2 \
-    libcanberra-gtk3-module \
-    ffmpeg \
+    tar \
+    procps \
+    iproute2 \
+    net-tools \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 🚨 OFFICIAL MOZILLA FIREFOX DEPLOYMENT 🚨
-# tar auto-detect (-x) फ़्लैग का इस्तेमाल ताकि bzip2/xz दोनों हैंडल हो सकें
+# -------------------------------
+# Firefox - official Mozilla build
+# -------------------------------
 RUN mkdir -p /opt && \
-    curl -L "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US" -o /tmp/firefox.tar.bz2 && \
-    tar -xf /tmp/firefox.tar.bz2 -C /opt/ && \
+    curl -fL \
+    "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US" \
+    -o /tmp/firefox.tar.bz2 && \
+    tar -xjf /tmp/firefox.tar.bz2 -C /opt && \
     ln -sf /opt/firefox/firefox /usr/local/bin/firefox && \
     rm -f /tmp/firefox.tar.bz2
 
-# ---- 🛠️ SAFE USER SETUP ---- #
-RUN echo "ubuntu:ubuntu" | chpasswd && \
-    usermod -aG sudo ubuntu && \
-    echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+# -------------------------------
+# ROOT USER
+# -------------------------------
+RUN echo "root:root" | chpasswd
 
-# Ubuntu 24.04 में Rootless Xorg परमिशन
-RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config && \
-    echo "needs_root_rights=no" >> /etc/X11/Xwrapper.config
+USER root
+WORKDIR /root
 
-# ⚡ SUPER SMOOTH & LOW LATENCY XRDP SETTINGS ⚡
-RUN sed -i 's/crypt_level=high/crypt_level=low/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/security_layer=negotiate/security_layer=rdp/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/max_bpp=32/max_bpp=16/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/use_compression=yes/use_compression=yes/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/#tcp_send_buffer_size=32768/tcp_send_buffer_size=131072/' /etc/xrdp/xrdp.ini && \
-    adduser xrdp ssl-cert
+# -------------------------------
+# Xorg configuration
+# -------------------------------
+RUN mkdir -p /etc/X11 && \
+    printf '%s\n' \
+    'allowed_users=anybody' \
+    'needs_root_rights=yes' \
+    > /etc/X11/Xwrapper.config
 
-# Xorg डिफ़ॉल्ट सेट करना
-RUN sed -i 's/errorsesman/xrdp\/xorg/g' /etc/xrdp/sesman.ini
+# -------------------------------
+# XRDP configuration
+# -------------------------------
+RUN sed -i 's/^crypt_level=.*/crypt_level=low/' /etc/xrdp/xrdp.ini || true && \
+    sed -i 's/^security_layer=.*/security_layer=rdp/' /etc/xrdp/xrdp.ini || true && \
+    sed -i 's/^max_bpp=.*/max_bpp=16/' /etc/xrdp/xrdp.ini || true && \
+    sed -i 's/^use_compression=.*/use_compression=yes/' /etc/xrdp/xrdp.ini || true && \
+    adduser xrdp ssl-cert || true
 
-# XFCE विज़ुअल एनिमेशन ऑफ और Firefox डेस्कटॉप आइकॉन
-RUN mkdir -p /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/ /home/ubuntu/Desktop && \
-    printf '<?xml version="1.0" encoding="UTF-8"?><channel name="xfwm4" version="1.0"><property name="general" type="empty"><property name="use_compositing" type="bool" value="false"/></property></channel>' > /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml && \
-    printf '[Desktop Entry]\nVersion=1.0\nType=Application\nName=Firefox\nComment=Access the Internet\nExec=firefox --no-sandbox\nIcon=/opt/firefox/browser/chrome/icons/default/default128.png\nTerminal=false\nCategories=Network;WebBrowser;\n' > /home/ubuntu/Desktop/firefox.desktop && \
-    chmod +x /home/ubuntu/Desktop/firefox.desktop
+# -------------------------------
+# XFCE configuration
+# -------------------------------
+RUN mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml && \
+    printf '%s\n' \
+    '<?xml version="1.0" encoding="UTF-8"?>' \
+    '<channel name="xfwm4" version="1.0">' \
+    '<property name="general" type="empty">' \
+    '<property name="use_compositing" type="bool" value="false"/>' \
+    '</property>' \
+    '</channel>' \
+    > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
 
-# XFCE एनवायरनमेंट स्क्रिप्ट्स और सही Permissions
-RUN printf 'export XDG_CURRENT_DESKTOP=XFCE\nexport XDG_SESSION_DESKTOP=xfce\nunset DBUS_SESSION_BUS_ADDRESS\nunset XDG_RUNTIME_DIR\nstartxfce4\n' > /home/ubuntu/.xsession && \
-    chmod +x /home/ubuntu/.xsession && \
-    cp /home/ubuntu/.xsession /home/ubuntu/.xsessionrc && \
-    chown -R ubuntu:ubuntu /home/ubuntu
+# -------------------------------
+# Root XFCE session
+# -------------------------------
+RUN printf '%s\n' \
+    '#!/bin/sh' \
+    'export XDG_CURRENT_DESKTOP=XFCE' \
+    'export XDG_SESSION_DESKTOP=xfce' \
+    'export XDG_CONFIG_DIRS=/etc/xdg/xdg-xfce:/etc/xdg' \
+    'unset DBUS_SESSION_BUS_ADDRESS' \
+    'unset XDG_RUNTIME_DIR' \
+    'exec startxfce4' \
+    > /root/.xsession && \
+    chmod +x /root/.xsession
 
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
+# -------------------------------
+# Firefox desktop shortcut
+# -------------------------------
+RUN mkdir -p /root/Desktop && \
+    printf '%s\n' \
+    '[Desktop Entry]' \
+    'Version=1.0' \
+    'Type=Application' \
+    'Name=Firefox' \
+    'Comment=Web Browser' \
+    'Exec=firefox --no-sandbox' \
+    'Icon=firefox' \
+    'Terminal=false' \
+    'Categories=Network;WebBrowser;' \
+    > /root/Desktop/firefox.desktop && \
+    chmod +x /root/Desktop/firefox.desktop
 
+# -------------------------------
+# XRDP startup script
+# -------------------------------
+RUN printf '%s\n' \
+    '#!/bin/bash' \
+    'set -e' \
+    '' \
+    'export HOME=/root' \
+    'export USER=root' \
+    '' \
+    'mkdir -p /run/xrdp' \
+    'mkdir -p /var/run/dbus' \
+    'rm -rf /tmp/.X11-unix/* /tmp/.X*-lock 2>/dev/null || true' \
+    '' \
+    'chown root:root /root' \
+    'chmod 700 /root' \
+    '' \
+    'if [ -x /usr/bin/dbus-daemon ]; then' \
+    '    dbus-daemon --system --fork 2>/dev/null || true' \
+    'fi' \
+    '' \
+    'rm -f /var/run/xrdp/xrdp.pid /var/run/xrdp/xrdp-sesman.pid 2>/dev/null || true' \
+    '' \
+    'echo "================================="' \
+    'echo " XRDP ROOT DESKTOP"' \
+    'echo "================================="' \
+    'echo "User: root"' \
+    'echo "Port: ${PORT:-3389}"' \
+    'echo "================================="' \
+    '' \
+    'if [ -n "${PORT}" ] && [ "${PORT}" != "3389" ]; then' \
+    '    sed -i "s/^port=.*/port=${PORT}/" /etc/xrdp/xrdp.ini' \
+    'fi' \
+    '' \
+    'xrdp-sesman &' \
+    'sleep 2' \
+    'exec xrdp --nodaemon' \
+    > /start.sh && \
+    chmod +x /start.sh
+
+# -------------------------------
+# XRDP port
+# -------------------------------
 EXPOSE 3389
+
+# -------------------------------
+# Run as ROOT
+# -------------------------------
+USER root
 
 CMD ["/start.sh"]
