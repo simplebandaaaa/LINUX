@@ -4,9 +4,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV HOME=/root
 ENV USER=root
 
-# -------------------------------
-# Base packages
-# -------------------------------
+# =========================================================
+# PACKAGES
+# =========================================================
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xrdp \
     xorgxrdp \
@@ -22,58 +22,65 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo \
     wget \
     curl \
-    bzip2 \
     ca-certificates \
     ssl-cert \
-    tar \
     procps \
     iproute2 \
     net-tools \
+    firefox \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# -------------------------------
-# Firefox - official Mozilla build
-# -------------------------------
-RUN mkdir -p /opt && \
-    curl -fL \
-    "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US" \
-    -o /tmp/firefox.tar.bz2 && \
-    tar -xjf /tmp/firefox.tar.bz2 -C /opt && \
-    ln -sf /opt/firefox/firefox /usr/local/bin/firefox && \
-    rm -f /tmp/firefox.tar.bz2
-
-# -------------------------------
+# =========================================================
 # ROOT USER
-# -------------------------------
-RUN echo "root:root" | chpasswd
-
+# =========================================================
 USER root
+
 WORKDIR /root
 
-# -------------------------------
-# Xorg configuration
-# -------------------------------
+RUN echo 'root:root' | chpasswd
+
+# =========================================================
+# XORG CONFIGURATION
+# =========================================================
 RUN mkdir -p /etc/X11 && \
     printf '%s\n' \
     'allowed_users=anybody' \
     'needs_root_rights=yes' \
     > /etc/X11/Xwrapper.config
 
-# -------------------------------
-# XRDP configuration
-# -------------------------------
+# =========================================================
+# XRDP CONFIGURATION
+# =========================================================
 RUN sed -i 's/^crypt_level=.*/crypt_level=low/' /etc/xrdp/xrdp.ini || true && \
     sed -i 's/^security_layer=.*/security_layer=rdp/' /etc/xrdp/xrdp.ini || true && \
     sed -i 's/^max_bpp=.*/max_bpp=16/' /etc/xrdp/xrdp.ini || true && \
     sed -i 's/^use_compression=.*/use_compression=yes/' /etc/xrdp/xrdp.ini || true && \
     adduser xrdp ssl-cert || true
 
-# -------------------------------
-# XFCE configuration
-# -------------------------------
-RUN mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml && \
-    printf '%s\n' \
+# =========================================================
+# XFCE ROOT SESSION
+# =========================================================
+RUN mkdir -p \
+    /root/.config/xfce4/xfconf/xfce-perchannel-xml \
+    /root/Desktop
+
+RUN printf '%s\n' \
+    '#!/bin/sh' \
+    'export HOME=/root' \
+    'export USER=root' \
+    'export XDG_CURRENT_DESKTOP=XFCE' \
+    'export XDG_SESSION_DESKTOP=xfce' \
+    'unset DBUS_SESSION_BUS_ADDRESS' \
+    'unset XDG_RUNTIME_DIR' \
+    'exec startxfce4' \
+    > /root/.xsession && \
+    chmod +x /root/.xsession
+
+# =========================================================
+# DISABLE XFCE COMPOSITING
+# =========================================================
+RUN printf '%s\n' \
     '<?xml version="1.0" encoding="UTF-8"?>' \
     '<channel name="xfwm4" version="1.0">' \
     '<property name="general" type="empty">' \
@@ -82,25 +89,10 @@ RUN mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml && \
     '</channel>' \
     > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
 
-# -------------------------------
-# Root XFCE session
-# -------------------------------
+# =========================================================
+# FIREFOX DESKTOP SHORTCUT
+# =========================================================
 RUN printf '%s\n' \
-    '#!/bin/sh' \
-    'export XDG_CURRENT_DESKTOP=XFCE' \
-    'export XDG_SESSION_DESKTOP=xfce' \
-    'export XDG_CONFIG_DIRS=/etc/xdg/xdg-xfce:/etc/xdg' \
-    'unset DBUS_SESSION_BUS_ADDRESS' \
-    'unset XDG_RUNTIME_DIR' \
-    'exec startxfce4' \
-    > /root/.xsession && \
-    chmod +x /root/.xsession
-
-# -------------------------------
-# Firefox desktop shortcut
-# -------------------------------
-RUN mkdir -p /root/Desktop && \
-    printf '%s\n' \
     '[Desktop Entry]' \
     'Version=1.0' \
     'Type=Application' \
@@ -113,54 +105,21 @@ RUN mkdir -p /root/Desktop && \
     > /root/Desktop/firefox.desktop && \
     chmod +x /root/Desktop/firefox.desktop
 
-# -------------------------------
-# XRDP startup script
-# -------------------------------
-RUN printf '%s\n' \
-    '#!/bin/bash' \
-    'set -e' \
-    '' \
-    'export HOME=/root' \
-    'export USER=root' \
-    '' \
-    'mkdir -p /run/xrdp' \
-    'mkdir -p /var/run/dbus' \
-    'rm -rf /tmp/.X11-unix/* /tmp/.X*-lock 2>/dev/null || true' \
-    '' \
-    'chown root:root /root' \
-    'chmod 700 /root' \
-    '' \
-    'if [ -x /usr/bin/dbus-daemon ]; then' \
-    '    dbus-daemon --system --fork 2>/dev/null || true' \
-    'fi' \
-    '' \
-    'rm -f /var/run/xrdp/xrdp.pid /var/run/xrdp/xrdp-sesman.pid 2>/dev/null || true' \
-    '' \
-    'echo "================================="' \
-    'echo " XRDP ROOT DESKTOP"' \
-    'echo "================================="' \
-    'echo "User: root"' \
-    'echo "Port: ${PORT:-3389}"' \
-    'echo "================================="' \
-    '' \
-    'if [ -n "${PORT}" ] && [ "${PORT}" != "3389" ]; then' \
-    '    sed -i "s/^port=.*/port=${PORT}/" /etc/xrdp/xrdp.ini' \
-    'fi' \
-    '' \
-    'xrdp-sesman &' \
-    'sleep 2' \
-    'exec xrdp --nodaemon' \
-    > /start.sh && \
-    chmod +x /start.sh
+# =========================================================
+# START SCRIPT
+# =========================================================
+COPY start.sh /start.sh
 
-# -------------------------------
-# XRDP port
-# -------------------------------
+RUN chmod +x /start.sh
+
+# =========================================================
+# XRDP PORT
+# =========================================================
 EXPOSE 3389
 
-# -------------------------------
-# Run as ROOT
-# -------------------------------
+# =========================================================
+# ROOT
+# =========================================================
 USER root
 
 CMD ["/start.sh"]
