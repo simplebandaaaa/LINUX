@@ -2,80 +2,67 @@
 
 set -e
 
-# =========================================================
-# ENVIRONMENT
-# =========================================================
-
 export HOME=/root
 export USER=root
 export LOGNAME=root
-
-export XDG_CURRENT_DESKTOP=XFCE
-export XDG_SESSION_DESKTOP=xfce
-export XDG_CONFIG_HOME=/root/.config
-export XDG_CACHE_HOME=/root/.cache
 
 PORT="${PORT:-3389}"
 
 echo "=========================================="
-echo "          MODERN XFCE RDP"
+echo "        XFCE XRDP STARTING"
 echo "=========================================="
-echo "User     : root"
-echo "Port     : ${PORT}"
-echo "Desktop  : XFCE"
-echo "Theme    : Greybird Dark"
-echo "Icons    : Papirus Dark"
-echo "Dock     : Plank"
-echo "Browser  : Falkon"
+echo "User: root"
+echo "Port: ${PORT}"
 echo "=========================================="
 
-# =========================================================
-# CLEAN OLD RUNTIME FILES
-# =========================================================
+# ---------------------------------------------------------
+# Runtime directories
+# ---------------------------------------------------------
+
+mkdir -p /run/xrdp
+mkdir -p /run/dbus
+mkdir -p /tmp/.X11-unix
+
+chmod 1777 /tmp/.X11-unix
+
+chown xrdp:xrdp /run/xrdp 2>/dev/null || true
+
+# ---------------------------------------------------------
+# Clean previous sessions
+# ---------------------------------------------------------
 
 rm -rf /tmp/.X11-unix/*
 rm -rf /tmp/.X*
 rm -rf /tmp/.x*
-rm -rf /var/run/xrdp/*
 
-mkdir -p /tmp/.X11-unix
-mkdir -p /var/run/xrdp
-mkdir -p /var/run/dbus
+rm -rf /run/xrdp/*
+rm -f /run/dbus/pid
 
-chmod 1777 /tmp/.X11-unix
-
-chown xrdp:xrdp /var/run/xrdp || true
-
-# =========================================================
-# XRDP PORT
-# =========================================================
+# ---------------------------------------------------------
+# Railway / PORT support
+# ---------------------------------------------------------
 
 if grep -q "^port=" /etc/xrdp/xrdp.ini; then
-
-    sed -i \
-        "s/^port=.*/port=${PORT}/" \
-        /etc/xrdp/xrdp.ini
-
+    sed -i "s/^port=.*/port=${PORT}/" /etc/xrdp/xrdp.ini
 else
-
-    sed -i \
-        "1i port=${PORT}" \
-        /etc/xrdp/xrdp.ini
-
+    echo "port=${PORT}" >> /etc/xrdp/xrdp.ini
 fi
 
-# =========================================================
-# ROOT PASSWORD
-# =========================================================
+# ---------------------------------------------------------
+# Root password
+# ---------------------------------------------------------
 
 echo "root:root" | chpasswd
 
-# =========================================================
-# XFCE SESSION
-# =========================================================
+# ---------------------------------------------------------
+# XRDP startwm.sh
+# ---------------------------------------------------------
 
-cat > /root/.xsession <<'EOF'
+cat > /etc/xrdp/startwm.sh <<'EOF'
 #!/bin/sh
+
+unset DBUS_SESSION_BUS_ADDRESS
+unset XDG_RUNTIME_DIR
 
 export HOME=/root
 export USER=root
@@ -83,11 +70,17 @@ export LOGNAME=root
 
 export XDG_CURRENT_DESKTOP=XFCE
 export XDG_SESSION_DESKTOP=xfce
-export XDG_CONFIG_HOME=/root/.config
-export XDG_CACHE_HOME=/root/.cache
 
-unset DBUS_SESSION_BUS_ADDRESS
-unset XDG_RUNTIME_DIR
+if test -r /etc/profile; then
+    . /etc/profile
+fi
+
+if test -r /etc/default/locale; then
+    . /etc/default/locale
+    export LANG
+    export LANGUAGE
+    export LC_ALL
+fi
 
 mkdir -p /root/.config
 mkdir -p /root/.cache
@@ -95,44 +88,112 @@ mkdir -p /root/.cache
 exec dbus-run-session -- startxfce4
 EOF
 
+chmod +x /etc/xrdp/startwm.sh
+
+# ---------------------------------------------------------
+# User .xsession
+# ---------------------------------------------------------
+
+cat > /root/.xsession <<'EOF'
+#!/bin/sh
+
+unset DBUS_SESSION_BUS_ADDRESS
+unset XDG_RUNTIME_DIR
+
+export HOME=/root
+export USER=root
+export LOGNAME=root
+
+export XDG_CURRENT_DESKTOP=XFCE
+export XDG_SESSION_DESKTOP=xfce
+
+exec dbus-run-session -- startxfce4
+EOF
+
 chmod +x /root/.xsession
 
-# =========================================================
-# MAKE DESKTOP FILES EXECUTABLE
-# =========================================================
+# ---------------------------------------------------------
+# XFCE theme
+# ---------------------------------------------------------
+
+mkdir -p \
+    /root/.config/xfce4/xfconf/xfce-perchannel-xml
+
+if command -v xfconf-query >/dev/null 2>&1; then
+
+    xfconf-query \
+        -c xsettings \
+        -p /Net/ThemeName \
+        -n \
+        -t string \
+        -s "Greybird-dark" \
+        2>/dev/null || true
+
+    xfconf-query \
+        -c xsettings \
+        -p /Net/IconThemeName \
+        -n \
+        -t string \
+        -s "Papirus-Dark" \
+        2>/dev/null || true
+
+    xfconf-query \
+        -c xfwm4 \
+        -p /general/use_compositing \
+        -n \
+        -t bool \
+        -s false \
+        2>/dev/null || true
+
+fi
+
+# ---------------------------------------------------------
+# Desktop permissions
+# ---------------------------------------------------------
 
 chmod +x /root/Desktop/*.desktop 2>/dev/null || true
 
-# =========================================================
-# CHECK IMPORTANT PROGRAMS
-# =========================================================
+# ---------------------------------------------------------
+# Show useful diagnostics
+# ---------------------------------------------------------
 
 echo ""
-echo "Checking installation..."
-
-command -v xfce4-session || true
+echo "Installed programs:"
 command -v startxfce4 || true
+command -v xfce4-session || true
 command -v falkon || true
 command -v plank || true
-command -v thunar || true
 command -v xrdp || true
-
 echo ""
 
-# =========================================================
-# START XRDP SESSION MANAGER
-# =========================================================
+# ---------------------------------------------------------
+# Start DBus system daemon if available
+# ---------------------------------------------------------
+
+if command -v dbus-daemon >/dev/null 2>&1; then
+
+    if [ ! -S /run/dbus/system_bus_socket ]; then
+        dbus-daemon --system --fork || true
+    fi
+
+fi
+
+# ---------------------------------------------------------
+# Start xrdp-sesman
+# ---------------------------------------------------------
 
 echo "Starting xrdp-sesman..."
+
+rm -f /run/xrdp/sesman.pid 2>/dev/null || true
 
 /usr/sbin/xrdp-sesman --nodaemon &
 
 sleep 2
 
-# =========================================================
-# START XRDP
-# =========================================================
+# ---------------------------------------------------------
+# Start XRDP
+# ---------------------------------------------------------
 
-echo "Starting XRDP on port ${PORT}..."
+echo "Starting xrdp on port ${PORT}..."
 
 exec /usr/sbin/xrdp --nodaemon
