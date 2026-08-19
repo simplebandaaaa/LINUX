@@ -8,7 +8,7 @@ ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 
 # =========================================================
-# XFCE + XRDP + FALKON + MODERN THEME
+# PACKAGES
 # =========================================================
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xrdp \
@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xfce4-session \
     xfce4-terminal \
     xfconf \
+    xfdesktop4 \
     thunar \
     dbus-x11 \
     dbus-user-session \
@@ -36,11 +37,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     plank \
     papirus-icon-theme \
     greybird-gtk-theme \
+    adwaita-icon-theme \
     fonts-dejavu \
     fonts-liberation \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# =========================================================
+# ROOT
+# =========================================================
 USER root
 
 WORKDIR /root
@@ -48,17 +53,25 @@ WORKDIR /root
 RUN echo 'root:root' | chpasswd
 
 # =========================================================
-# XRDP
+# CREATE ALL DIRECTORIES
 # =========================================================
-RUN adduser xrdp ssl-cert || true
-
 RUN mkdir -p \
     /var/run/xrdp \
     /var/run/dbus \
     /tmp/.X11-unix \
+    /usr/share/backgrounds \
     /root/.config \
     /root/.cache \
     /root/.local/share \
+    /root/.local/share/backgrounds \
+    /root/.config/xfce4 \
+    /root/.config/xfce4/xfconf \
+    /root/.config/xfce4/xfconf/xfce-perchannel-xml \
+    /root/.config/xfce4/panel \
+    /root/.config/autostart \
+    /root/.config/plank \
+    /root/.config/plank/dock1 \
+    /root/.config/plank/dock1/launchers \
     /root/Desktop
 
 RUN chmod 1777 /tmp/.X11-unix && \
@@ -74,57 +87,97 @@ RUN mkdir -p /etc/X11 && \
     > /etc/X11/Xwrapper.config
 
 # =========================================================
-# XRDP CONFIG
+# XRDP
 # =========================================================
+RUN adduser xrdp ssl-cert || true
+
 RUN sed -i 's/^crypt_level=.*/crypt_level=low/' /etc/xrdp/xrdp.ini || true && \
     sed -i 's/^security_layer=.*/security_layer=rdp/' /etc/xrdp/xrdp.ini || true && \
     sed -i 's/^max_bpp=.*/max_bpp=16/' /etc/xrdp/xrdp.ini || true && \
     sed -i 's/^use_compression=.*/use_compression=yes/' /etc/xrdp/xrdp.ini || true
 
 # =========================================================
-# CUSTOM WALLPAPER
+# CUSTOM DARK WALLPAPER
 # =========================================================
-RUN mkdir -p /usr/share/backgrounds && \
-cat > /usr/share/backgrounds/rdp-dark.svg <<'EOF'
+RUN cat > /usr/share/backgrounds/rdp-dark.svg <<'EOF'
 <svg xmlns="http://www.w3.org/2000/svg"
-     width="1920" height="1080" viewBox="0 0 1920 1080">
+     width="1920"
+     height="1080"
+     viewBox="0 0 1920 1080">
 
 <defs>
-  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0%" stop-color="#07111f"/>
-    <stop offset="55%" stop-color="#102746"/>
-    <stop offset="100%" stop-color="#050914"/>
+
+  <linearGradient id="sky"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1">
+
+    <stop offset="0%" stop-color="#050914"/>
+    <stop offset="55%" stop-color="#10243e"/>
+    <stop offset="100%" stop-color="#03050a"/>
+
   </linearGradient>
 
-  <linearGradient id="mountain" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0%" stop-color="#182f50"/>
+  <linearGradient id="mountain"
+                  x1="0"
+                  y1="0"
+                  x2="1"
+                  y2="1">
+
+    <stop offset="0%" stop-color="#29476b"/>
     <stop offset="100%" stop-color="#050914"/>
+
   </linearGradient>
 
   <radialGradient id="moon">
-    <stop offset="0%" stop-color="#ffffff" stop-opacity=".9"/>
-    <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+
+    <stop offset="0%"
+          stop-color="#ffffff"
+          stop-opacity=".95"/>
+
+    <stop offset="100%"
+          stop-color="#ffffff"
+          stop-opacity="0"/>
+
   </radialGradient>
+
 </defs>
 
-<rect width="1920" height="1080" fill="url(#sky)"/>
+<rect width="1920"
+      height="1080"
+      fill="url(#sky)"/>
 
-<circle cx="1500" cy="230" r="170" fill="url(#moon)"/>
-<circle cx="1500" cy="230" r="55" fill="#dce8ff"/>
+<!-- Moon -->
+<circle cx="1510"
+        cy="220"
+        r="180"
+        fill="url(#moon)"/>
 
-<g fill="#ffffff" opacity=".75">
-  <circle cx="220" cy="180" r="2"/>
-  <circle cx="410" cy="270" r="2"/>
-  <circle cx="620" cy="130" r="2"/>
-  <circle cx="850" cy="220" r="2"/>
-  <circle cx="1040" cy="120" r="2"/>
-  <circle cx="1270" cy="320" r="2"/>
-  <circle cx="1700" cy="150" r="2"/>
-  <circle cx="1800" cy="350" r="2"/>
+<circle cx="1510"
+        cy="220"
+        r="58"
+        fill="#e6efff"/>
+
+<!-- Stars -->
+<g fill="#ffffff"
+   opacity=".8">
+
+  <circle cx="180" cy="160" r="2"/>
+  <circle cx="330" cy="260" r="2"/>
+  <circle cx="510" cy="120" r="2"/>
+  <circle cx="690" cy="210" r="2"/>
+  <circle cx="850" cy="100" r="2"/>
+  <circle cx="1040" cy="230" r="2"/>
+  <circle cx="1230" cy="120" r="2"/>
+  <circle cx="1740" cy="160" r="2"/>
+  <circle cx="1830" cy="330" r="2"/>
+
 </g>
 
-<path d="
-M0 850
+<!-- Back mountains -->
+<path
+d="M0 850
 L220 650
 L360 760
 L560 500
@@ -136,11 +189,12 @@ L1560 620
 L1770 470
 L1920 650
 L1920 1080
-L0 1080 Z"
+L0 1080Z"
 fill="url(#mountain)"/>
 
-<path d="
-M0 930
+<!-- Front mountains -->
+<path
+d="M0 930
 L260 760
 L430 840
 L650 670
@@ -151,19 +205,20 @@ L1480 570
 L1670 760
 L1920 640
 L1920 1080
-L0 1080 Z"
-fill="#050914"
-opacity=".95"/>
+L0 1080Z"
+fill="#03060d"
+opacity=".96"/>
 
-<path d="
-M1370 390
+<!-- Snow peak -->
+<path
+d="M1370 390
 L1470 540
-L1430 520
+L1435 515
 L1500 610
 L1370 560
 L1290 610
 Z"
-fill="#304d70"
+fill="#496786"
 opacity=".8"/>
 
 </svg>
@@ -196,7 +251,7 @@ EOF
 RUN chmod +x /root/.xsession
 
 # =========================================================
-# DARK XFCE THEME
+# XFCE GTK / ICON THEME
 # =========================================================
 RUN cat > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -239,7 +294,7 @@ RUN cat > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml <<'EOF'
 EOF
 
 # =========================================================
-# XFWM WINDOWS
+# XFWM SETTINGS
 # =========================================================
 RUN cat > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -274,7 +329,7 @@ RUN cat > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml <<'EOF'
 EOF
 
 # =========================================================
-# DESKTOP WALLPAPER
+# XFCE DESKTOP / WALLPAPER
 # =========================================================
 RUN cat > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -313,15 +368,13 @@ RUN cat > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml <<'EO
 EOF
 
 # =========================================================
-# PLANK DOCK CONFIG
+# PLANK DOCK
 # =========================================================
-RUN mkdir -p /root/.config/plank/dock1/launchers
-
 RUN cat > /root/.config/plank/dock1/settings <<'EOF'
 [PlankDockPreferences]
 Alignment=center
 AutoPinning=true
-DockItems=terminal.dockitem;falkon.dockitem;thunar.dockitem;
+DockItems=terminal.dockitem;thunar.dockitem;falkon.dockitem;
 HideMode=none
 IconSize=48
 ItemsAlignment=center
@@ -332,11 +385,9 @@ ZoomEnabled=true
 ZoomPercent=130
 EOF
 
-RUN cat > /root/.config/plank/dock1/launchers/falkon.dockitem <<'EOF'
-[PlankDockItemPreferences]
-Launcher=file:///usr/share/applications/org.kde.falkon.desktop
-EOF
-
+# =========================================================
+# PLANK APPLICATIONS
+# =========================================================
 RUN cat > /root/.config/plank/dock1/launchers/terminal.dockitem <<'EOF'
 [PlankDockItemPreferences]
 Launcher=file:///usr/share/applications/xfce4-terminal.desktop
@@ -347,16 +398,19 @@ RUN cat > /root/.config/plank/dock1/launchers/thunar.dockitem <<'EOF'
 Launcher=file:///usr/share/applications/thunar.desktop
 EOF
 
-# =========================================================
-# AUTOSTART PLANK
-# =========================================================
-RUN mkdir -p /root/.config/autostart
+RUN cat > /root/.config/plank/dock1/launchers/falkon.dockitem <<'EOF'
+[PlankDockItemPreferences]
+Launcher=file:///usr/share/applications/org.kde.falkon.desktop
+EOF
 
+# =========================================================
+# START PLANK AUTOMATICALLY
+# =========================================================
 RUN cat > /root/.config/autostart/plank.desktop <<'EOF'
 [Desktop Entry]
 Type=Application
 Name=Plank
-Comment=Desktop Dock
+Comment=Modern Desktop Dock
 Exec=plank
 OnlyShowIn=XFCE;
 X-GNOME-Autostart-enabled=true
@@ -370,7 +424,7 @@ RUN cat > /root/Desktop/falkon.desktop <<'EOF'
 Version=1.0
 Type=Application
 Name=Falkon
-Comment=Web Browser
+Comment=Lightweight Web Browser
 Exec=falkon
 Icon=org.kde.falkon
 Terminal=false
@@ -385,6 +439,7 @@ RUN cat > /root/Desktop/terminal.desktop <<'EOF'
 Version=1.0
 Type=Application
 Name=Terminal
+Comment=XFCE Terminal
 Exec=xfce4-terminal
 Icon=utilities-terminal
 Terminal=false
@@ -399,6 +454,7 @@ RUN cat > /root/Desktop/files.desktop <<'EOF'
 Version=1.0
 Type=Application
 Name=Files
+Comment=File Manager
 Exec=thunar
 Icon=system-file-manager
 Terminal=false
@@ -414,6 +470,9 @@ COPY start.sh /start.sh
 
 RUN chmod +x /start.sh
 
+# =========================================================
+# PORT
+# =========================================================
 EXPOSE 3389
 
 USER root
