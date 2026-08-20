@@ -5,17 +5,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     USER=root
 
 # =========================================================
-# PACKAGES & MOZILLA PPA (Firefox Snap Workaround)
+# PACKAGES (Falkon Browser Installed)
 # =========================================================
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
-    && add-apt-repository ppa:mozillateam/ppa -y \
-    && printf '%s\n' \
-        'Package: firefox*' \
-        'Pin: release o=LP-PPA-mozillateam' \
-        'Pin-Priority: 1001' \
-        > /etc/apt/preferences.d/mozilla-firefox \
-    && apt-get update && apt-get install -y --no-install-recommends \
     xrdp \
     xorgxrdp \
     xserver-xorg-core \
@@ -35,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     iproute2 \
     net-tools \
-    firefox \
+    falkon \
     libasound2t64 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -87,20 +79,20 @@ RUN mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml /root/Desktop && \
     > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
 
 # =========================================================
-# FIREFOX DESKTOP SHORTCUT
+# FALKON DESKTOP SHORTCUT
 # =========================================================
 RUN printf '%s\n' \
     '[Desktop Entry]' \
     'Version=1.0' \
     'Type=Application' \
-    'Name=Firefox' \
+    'Name=Falkon' \
     'Comment=Web Browser' \
-    'Exec=firefox --no-remote %u' \
-    'Icon=firefox' \
+    'Exec=falkon %u' \
+    'Icon=falkon' \
     'Terminal=false' \
     'Categories=Network;WebBrowser;' \
-    > /root/Desktop/firefox.desktop && \
-    chmod +x /root/Desktop/firefox.desktop
+    > /root/Desktop/falkon.desktop && \
+    chmod +x /root/Desktop/falkon.desktop
 
 # =========================================================
 # START SCRIPT & EXPOSE
