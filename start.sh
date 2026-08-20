@@ -1,24 +1,32 @@
 #!/bin/bash
+
 set -e
 
 echo "======================================"
-echo " Starting XFCE + XRDP"
+echo " XFCE + XRDP"
 echo " Railway PORT: ${PORT:-3389}"
 echo "======================================"
 
-# Railway assigns the external/internal application port.
+# Railway provides PORT dynamically
 XRDP_PORT="${PORT:-3389}"
 
-# Configure XRDP to listen on Railway's PORT
+# --------------------------------------------------
+# Configure XRDP port
+# --------------------------------------------------
 sed -i "s/^port=.*/port=${XRDP_PORT}/" /etc/xrdp/xrdp.ini
 
-# Make sure XRDP directories exist
+# --------------------------------------------------
+# Prepare XRDP directories
+# --------------------------------------------------
 mkdir -p /run/xrdp
 mkdir -p /var/run/xrdp
 
-chown xrdp:xrdp /run/xrdp /var/run/xrdp
+chown xrdp:xrdp /run/xrdp
+chown xrdp:xrdp /var/run/xrdp
 
-# Remove stale sockets / PID files
+# --------------------------------------------------
+# Remove stale files
+# --------------------------------------------------
 rm -f /run/xrdp/xrdp.pid
 rm -f /run/xrdp/xrdp-sesman.pid
 rm -f /var/run/xrdp/xrdp.pid
@@ -30,18 +38,30 @@ rm -rf /tmp/.X*-lock
 mkdir -p /tmp/.X11-unix
 chmod 1777 /tmp/.X11-unix
 
-# Ensure ubuntu owns its home
+# --------------------------------------------------
+# Fix ownership
+# --------------------------------------------------
 chown -R ubuntu:ubuntu /home/ubuntu
 
-# Start DBus system bus
+# --------------------------------------------------
+# Start DBus
+# --------------------------------------------------
+mkdir -p /run/dbus
+
 if [ ! -e /run/dbus/system_bus_socket ]; then
-    mkdir -p /run/dbus
     dbus-daemon --system --fork
 fi
 
-echo "Starting XRDP on port ${XRDP_PORT}..."
+# --------------------------------------------------
+# Start XRDP session manager
+# --------------------------------------------------
+echo "Starting xrdp-sesman..."
 
-# Start XRDP
 /usr/sbin/xrdp-sesman
+
+# --------------------------------------------------
+# Start XRDP in foreground
+# --------------------------------------------------
+echo "Starting XRDP on port ${XRDP_PORT}..."
 
 exec /usr/sbin/xrdp --nodaemon
