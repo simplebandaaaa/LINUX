@@ -7,39 +7,36 @@ PORT="${PORT:-3389}"
 echo "=========================================="
 echo "          XFCE XRDP DESKTOP"
 echo "=========================================="
-echo "User   : rdpuser"
-echo "Pass   : rdp123"
-echo "Port   : ${PORT}"
-echo "Theme  : Greybird Dark"
-echo "Icons  : Papirus Dark"
-echo "Dock   : Plank"
-echo "Browser: Falkon"
+echo "Username : rdpuser"
+echo "Password : rdp123"
+echo "Port     : ${PORT}"
+echo "Theme    : Greybird Dark"
+echo "Icons    : Papirus Dark"
+echo "Browser  : Falkon"
 echo "=========================================="
 
 # =========================================================
-# RUNTIME DIRECTORIES
+# RUNTIME
 # =========================================================
 
-mkdir -p \
-    /run/xrdp \
-    /run/dbus \
-    /tmp/.X11-unix
+mkdir -p /run/xrdp
+mkdir -p /run/dbus
+mkdir -p /tmp/.X11-unix
 
 chmod 1777 /tmp/.X11-unix
-
 chown xrdp:xrdp /run/xrdp || true
 
 # =========================================================
-# CLEAN OLD SESSION FILES
+# CLEAN OLD FILES
 # =========================================================
 
+rm -rf /run/xrdp/*
 rm -rf /tmp/.X11-unix/*
 rm -rf /tmp/.X*
 rm -rf /tmp/.x*
-rm -rf /run/xrdp/*
 
 # =========================================================
-# XRDP PORT
+# PORT
 # =========================================================
 
 if grep -q "^port=" /etc/xrdp/xrdp.ini; then
@@ -49,7 +46,7 @@ else
 fi
 
 # =========================================================
-# RDP USER
+# USER
 # =========================================================
 
 echo "rdpuser:rdp123" | chpasswd
@@ -77,30 +74,39 @@ export LOGNAME=rdpuser
 
 export XDG_CURRENT_DESKTOP=XFCE
 export XDG_SESSION_DESKTOP=xfce
-export XDG_CONFIG_HOME=/home/rdpuser/.config
-export XDG_CACHE_HOME=/home/rdpuser/.cache
 
-exec dbus-run-session -- startxfce4
+exec startxfce4
 EOF
 
 chmod +x /home/rdpuser/.xsession
-
 chown rdpuser:rdpuser /home/rdpuser/.xsession
 
 # =========================================================
-# START SYSTEM DBUS
+# VERIFY
 # =========================================================
 
-if command -v dbus-daemon >/dev/null 2>&1; then
+echo ""
+echo "Checking components..."
 
-    if [ ! -S /run/dbus/system_bus_socket ]; then
-        dbus-daemon --system --fork || true
-    fi
+command -v startxfce4
+command -v xfce4-session
+command -v xrdp
+command -v xrdp-sesman
+command -v falkon
+command -v thunar
 
+echo ""
+
+# =========================================================
+# DBUS SYSTEM SERVICE
+# =========================================================
+
+if [ ! -S /run/dbus/system_bus_socket ]; then
+    dbus-daemon --system --fork || true
 fi
 
 # =========================================================
-# START XRDP SESSION MANAGER
+# XRDP SESSION MANAGER
 # =========================================================
 
 echo "Starting xrdp-sesman..."
@@ -110,7 +116,7 @@ echo "Starting xrdp-sesman..."
 sleep 2
 
 # =========================================================
-# START XRDP
+# XRDP
 # =========================================================
 
 echo "Starting XRDP on port ${PORT}..."
