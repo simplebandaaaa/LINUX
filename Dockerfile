@@ -1,13 +1,19 @@
 FROM ubuntu:24.04
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV HOME=/root
-ENV USER=root
+ENV DEBIAN_FRONTEND=noninteractive \
+    HOME=/root \
+    USER=root
 
-# =========================================================
-# PACKAGES
-# =========================================================
+# 1. Mozilla PPA Add karke direct (non-snap) Firefox install karein
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    && add-apt-repository ppa:mozillateam/ppa -y \
+    && printf '%s\n' \
+        'Package: firefox*' \
+        'Pin: release o=LP-PPA-mozillateam' \
+        'Pin-Priority: 1001' \
+        > /etc/apt/preferences.d/mozilla-firefox \
+    && apt-get update && apt-get install -y --no-install-recommends \
     xrdp \
     xorgxrdp \
     xserver-xorg-core \
@@ -27,57 +33,42 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     iproute2 \
     net-tools \
-    falkon \
+    firefox \
+    libasound2 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# =========================================================
-# ROOT USER
-# =========================================================
-USER root
 WORKDIR /root
-RUN echo 'root:root' | chpasswd
 
-# =========================================================
-# XORG CONFIGURATION
-# =========================================================
-RUN mkdir -p /etc/X11 && \
+# 2. System & XRDP Config
+RUN echo 'root:root' | chpasswd && \
+    adduser xrdp ssl-cert || true && \
+    mkdir -p /var/run/xrdp /var/run/xrdp-sesman && \
+    mkdir -p /etc/X11 && \
     printf '%s\n' \
     'allowed_users=anybody' \
     'needs_root_rights=yes' \
     > /etc/X11/Xwrapper.config
 
-# =========================================================
-# XRDP CONFIGURATION
-# =========================================================
 RUN sed -i 's/^crypt_level=.*/crypt_level=low/' /etc/xrdp/xrdp.ini || true && \
     sed -i 's/^security_layer=.*/security_layer=rdp/' /etc/xrdp/xrdp.ini || true && \
     sed -i 's/^max_bpp=.*/max_bpp=16/' /etc/xrdp/xrdp.ini || true && \
-    sed -i 's/^use_compression=.*/use_compression=yes/' /etc/xrdp/xrdp.ini || true && \
-    adduser xrdp ssl-cert || true
+    sed -i 's/^use_compression=.*/use_compression=yes/' /etc/xrdp/xrdp.ini || true
 
-# =========================================================
-# XFCE ROOT SESSION
-# =========================================================
-RUN mkdir -p \
-    /root/.config/xfce4/xfconf/xfce-perchannel-xml \
-    /root/Desktop
-
-RUN printf '%s\n' \
+# 3. XFCE Session Config
+RUN mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml /root/Desktop && \
+    printf '%s\n' \
     '#!/bin/sh' \
     'export HOME=/root' \
     'export USER=root' \
     'export XDG_CURRENT_DESKTOP=XFCE' \
     'export XDG_SESSION_DESKTOP=xfce' \
-    'eval $(dbus-launch --sh-syntax --exit-with-session)' \
+    'unset DBUS_SESSION_BUS_ADDRESS' \
+    'unset XDG_RUNTIME_DIR' \
     'exec startxfce4' \
     > /root/.xsession && \
-    chmod +x /root/.xsession
-
-# =========================================================
-# DISABLE XFCE COMPOSITING
-# =========================================================
-RUN printf '%s\n' \
+    chmod +x /root/.xsession && \
+    printf '%s\n' \
     '<?xml version="1.0" encoding="UTF-8"?>' \
     '<channel name="xfwm4" version="1.0">' \
     '<property name="general" type="empty">' \
@@ -86,40 +77,23 @@ RUN printf '%s\n' \
     '</channel>' \
     > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
 
-# =========================================================
-# FALKON DESKTOP SHORTCUT & SYSTEM WRAPPER
-# =========================================================
-# Root user ke liye --no-sandbox flag ZAROORI hota hai
-RUN mv /usr/bin/falkon /usr/bin/falkon-bin && \
-    printf '%s\n' \
-    '#!/bin/sh' \
-    'exec /usr/bin/falkon-bin --no-sandbox "$@"' \
-    > /usr/bin/falkon && \
-    chmod +x /usr/bin/falkon
-
+# 4. Firefox Desktop Shortcut (Root Flag Fix)
 RUN printf '%s\n' \
     '[Desktop Entry]' \
     'Version=1.0' \
     'Type=Application' \
-    'Name=Falkon' \
+    'Name=Firefox' \
     'Comment=Web Browser' \
-    'Exec=falkon' \
-    'Icon=falkon' \
+    'Exec=firefox --no-remote %u' \
+    'Icon=firefox' \
     'Terminal=false' \
     'Categories=Network;WebBrowser;' \
-    > /root/Desktop/falkon.desktop && \
-    chmod +x /root/Desktop/falkon.desktop
+    > /root/Desktop/firefox.desktop && \
+    chmod +x /root/Desktop/firefox.desktop
 
-# =========================================================
-# START SCRIPT
-# =========================================================
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
-# =========================================================
-# XRDP PORT
-# =========================================================
 EXPOSE 3389
 
-USER root
 CMD ["/start.sh"]
