@@ -5,7 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     USER=root
 
 # =========================================================
-# PACKAGES (Falkon Browser Installed)
+# PACKAGES & BRAVE BROWSER APT REPO
 # =========================================================
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xrdp \
@@ -27,8 +27,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     iproute2 \
     net-tools \
-    falkon \
     libasound2t64 \
+    gpg \
+    && curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" | tee /etc/apt/sources.list.d/brave-browser-release.list \
+    && apt-get update && apt-get install -y --no-install-recommends brave-browser \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -79,20 +82,20 @@ RUN mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml /root/Desktop && \
     > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
 
 # =========================================================
-# FALKON DESKTOP SHORTCUT
+# BRAVE DESKTOP SHORTCUT (Root Sandbox Bypass Flags)
 # =========================================================
 RUN printf '%s\n' \
     '[Desktop Entry]' \
     'Version=1.0' \
     'Type=Application' \
-    'Name=Falkon' \
+    'Name=Brave' \
     'Comment=Web Browser' \
-    'Exec=falkon %u' \
-    'Icon=falkon' \
+    'Exec=brave-browser --no-sandbox --disable-dev-shm-usage %u' \
+    'Icon=brave-browser' \
     'Terminal=false' \
     'Categories=Network;WebBrowser;' \
-    > /root/Desktop/falkon.desktop && \
-    chmod +x /root/Desktop/falkon.desktop
+    > /root/Desktop/brave.desktop && \
+    chmod +x /root/Desktop/brave.desktop
 
 # =========================================================
 # START SCRIPT & EXPOSE
