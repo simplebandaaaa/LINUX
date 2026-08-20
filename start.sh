@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Create runtime directory for D-Bus to prevent XFCE login session crashes
+# Create runtime directory for D-Bus
 mkdir -p /run/user/1000
 chown -R ubuntu:ubuntu /run/user/1000
 chmod 700 /run/user/1000
