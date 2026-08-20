@@ -1,14 +1,13 @@
-#!/bin/sh
+#!/bin/bash
 
-# D-Bus folders aur Machine ID setup
-mkdir -p /var/run/dbus
-dbus-uuidgen --ensure=/etc/machine-id
-dbus-uuidgen --ensure=/var/lib/dbus/machine-id
-dbus-daemon --system --fork
+# Purani PID aur lock files saaf karein (taaki container Crash hone par issue na aaye)
+rm -f /var/run/xrdp/xrdp.pid
+rm -f /var/run/xrdp/xrdp-sesman.pid
+rm -f /tmp/.X*-lock
 
-# XRDP services start
-service xrdp start
-service xrdp-sesman start
+# Directories ensure karein
+mkdir -p /var/run/xrdp /var/run/xrdp-sesman
 
-# Logs tail karke container ko running rakhein
-tail -f /var/log/xrdp.log /var/log/xrdp-sesman.log
+# Services start karein
+xrdp-sesman
+xrdp --nodaemon
