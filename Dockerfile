@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     add-apt-repository -y ppa:mozillateam/ppa && \
     printf 'Package: firefox*\nPin: release o=LP-PPA-mozillateam\nPin-Priority: 1001\n' > /etc/apt/preferences.d/mozilla-firefox
 
-# Essential packages (Updated wine meta-packages)
+# Essential packages + Theme compilation dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xrdp \
     xorgxrdp \
@@ -29,6 +29,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo \
     curl \
     wget \
+    git \
+    bc \
+    optipng \
+    inkscape \
+    libglib2.0-bin \
+    gtk2-engines-murrine \
+    gtk2-engines-pixbuf \
     ssl-cert \
     wine64 \
     wine32:i386 \
@@ -36,7 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Safe User Setup
+# ---- 🛠️ SAFE USER SETUP ---- #
 RUN echo "ubuntu:ubuntu" | chpasswd && \
     usermod -aG sudo ubuntu && \
     echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
@@ -45,18 +52,49 @@ RUN echo "ubuntu:ubuntu" | chpasswd && \
 RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config && \
     echo "needs_root_rights=yes" >> /etc/X11/Xwrapper.config
 
-# XRDP Performance Tuning
+# 🍎 WHITESUR MACOS THEME & ICONS INSTALLATION 🍎
+RUN git clone https://github.com/vinceliuice/WhiteSur-gtk-theme.git --depth 1 /tmp/WhiteSur-gtk-theme && \
+    /tmp/WhiteSur-gtk-theme/install.sh -t all -c light -s standard --xfce && \
+    rm -rf /tmp/WhiteSur-gtk-theme
+
+RUN git clone https://github.com/vinceliuice/WhiteSur-icon-theme.git --depth 1 /tmp/WhiteSur-icon-theme && \
+    /tmp/WhiteSur-icon-theme/install.sh && \
+    rm -rf /tmp/WhiteSur-icon-theme
+
+RUN git clone https://github.com/vinceliuice/McHigh-Cursors.git --depth 1 /tmp/McHigh-Cursors && \
+    cp -r /tmp/McHigh-Cursors/McHigh-cursor /usr/share/icons/ && \
+    rm -rf /tmp/McHigh-Cursors
+
+# ⚡ SUPER SMOOTH & LIGHTWEIGHT XRDP SETTINGS ⚡
 RUN sed -i 's/crypt_level=high/crypt_level=low/' /etc/xrdp/xrdp.ini && \
     sed -i 's/security_layer=negotiate/security_layer=rdp/' /etc/xrdp/xrdp.ini && \
     sed -i 's/max_bpp=32/max_bpp=16/' /etc/xrdp/xrdp.ini && \
     sed -i 's/#tcp_send_buffer_size=32768/tcp_send_buffer_size=131072/' /etc/xrdp/xrdp.ini && \
     adduser xrdp ssl-cert
 
-# Disable Compositing (Lag reduction)
-RUN mkdir -p /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/ && \
-    printf '<?xml version="1.0" encoding="UTF-8"?><channel name="xfwm4" version="1.0"><property name="general" type="empty"><property name="use_compositing" type="bool" value="false"/></property></channel>' > /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
+# 🍎 DEFAULT XFCE CONFIGURATION FOR WHITESUR THEME 🍎
+RUN mkdir -p /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/
 
-# XFCE Session Init
+# Apply WhiteSur GTK & Window Theme
+RUN printf '<?xml version="1.0" encoding="UTF-8"?>\n\
+<channel name="xsettings" version="1.0">\n\
+  <property name="Net" type="empty">\n\
+    <property name="ThemeName" type="string" value="WhiteSur-Light"/>\n\
+    <property name="IconThemeName" type="string" value="WhiteSur"/>\n\
+    <property name="CursorThemeName" type="string" value="McHigh-cursor"/>\n\
+  </property>\n\
+</channel>' > /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
+
+# Apply Window Manager (xfwm4) Theme & Disable Compositing
+RUN printf '<?xml version="1.0" encoding="UTF-8"?>\n\
+<channel name="xfwm4" version="1.0">\n\
+  <property name="general" type="empty">\n\
+    <property name="theme" type="string" value="WhiteSur-Light"/>\n\
+    <property name="use_compositing" type="bool" value="false"/>\n\
+  </property>\n\
+</channel>' > /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
+
+# XFCE Environment Scripts
 RUN printf 'export XDG_CURRENT_DESKTOP=XFCE\nexport XDG_SESSION_DESKTOP=xfce\nstartxfce4\n' > /home/ubuntu/.xsession && \
     chmod +x /home/ubuntu/.xsession && \
     cp /home/ubuntu/.xsession /home/ubuntu/.xsessionrc && \
