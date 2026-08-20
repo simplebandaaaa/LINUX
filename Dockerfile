@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     add-apt-repository -y ppa:mozillateam/ppa && \
     printf 'Package: firefox*\nPin: release o=LP-PPA-mozillateam\nPin-Priority: 1001\n' > /etc/apt/preferences.d/mozilla-firefox
 
-# Essential packages + Theme compilation dependencies (sassc & glib added)
+# Essential packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xrdp \
     xorgxrdp \
@@ -30,10 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
-    sassc \
-    optipng \
-    inkscape \
-    libglib2.0-bin \
+    tar \
     gtk2-engines-murrine \
     gtk2-engines-pixbuf \
     ssl-cert \
@@ -52,17 +49,22 @@ RUN echo "ubuntu:ubuntu" | chpasswd && \
 RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config && \
     echo "needs_root_rights=yes" >> /etc/X11/Xwrapper.config
 
-# 🍎 WHITESUR MACOS THEME INSTALLATION (Silent / Non-interactive Mode) 🍎
-RUN git clone https://github.com/vinceliuice/WhiteSur-gtk-theme.git --depth 1 /tmp/WhiteSur-gtk-theme && \
-    /tmp/WhiteSur-gtk-theme/install.sh -t light -s standard -d /usr/share/themes --xfce && \
-    rm -rf /tmp/WhiteSur-gtk-theme
+# 🍎 WHITESUR THEME & ICONS (DIRECT EXTRACT METHOD - NO INSTALLER SCRIPT) 🍎
+# Download & Extract WhiteSur GTK Theme
+RUN mkdir -p /usr/share/themes && \
+    curl -sL https://github.com/vinceliuice/WhiteSur-gtk-theme/archive/refs/heads/master.tar.gz | tar -xz -C /tmp && \
+    mv /tmp/WhiteSur-gtk-theme-master/src/WhiteSur-Light /usr/share/themes/ 2>/dev/null || \
+    cp -r /tmp/WhiteSur-gtk-theme-master /usr/share/themes/WhiteSur-Light && \
+    rm -rf /tmp/WhiteSur-gtk-theme-master
 
-RUN git clone https://github.com/vinceliuice/WhiteSur-icon-theme.git --depth 1 /tmp/WhiteSur-icon-theme && \
-    /tmp/WhiteSur-icon-theme/install.sh -d /usr/share/icons && \
+# Download & Extract WhiteSur Icons
+RUN mkdir -p /usr/share/icons && \
+    git clone https://github.com/vinceliuice/WhiteSur-icon-theme.git --depth 1 /tmp/WhiteSur-icon-theme && \
+    cp -r /tmp/WhiteSur-icon-theme/src/WhiteSur /usr/share/icons/WhiteSur && \
     rm -rf /tmp/WhiteSur-icon-theme
 
+# Download & Extract macOS Cursors
 RUN git clone https://github.com/vinceliuice/McHigh-Cursors.git --depth 1 /tmp/McHigh-Cursors && \
-    mkdir -p /usr/share/icons && \
     cp -r /tmp/McHigh-Cursors/McHigh-cursor /usr/share/icons/ && \
     rm -rf /tmp/McHigh-Cursors
 
