@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     add-apt-repository -y ppa:mozillateam/ppa && \
     printf 'Package: firefox*\nPin: release o=LP-PPA-mozillateam\nPin-Priority: 1001\n' > /etc/apt/preferences.d/mozilla-firefox
 
-# Essential packages + Theme compilation dependencies
+# Essential packages + Theme dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xrdp \
     xorgxrdp \
@@ -30,10 +30,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
-    bc \
-    optipng \
-    inkscape \
-    libglib2.0-bin \
     gtk2-engines-murrine \
     gtk2-engines-pixbuf \
     ssl-cert \
@@ -54,14 +50,17 @@ RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config && \
 
 # 🍎 WHITESUR MACOS THEME & ICONS INSTALLATION 🍎
 RUN git clone https://github.com/vinceliuice/WhiteSur-gtk-theme.git --depth 1 /tmp/WhiteSur-gtk-theme && \
-    /tmp/WhiteSur-gtk-theme/install.sh -t all -c light -s standard --xfce && \
+    mkdir -p /usr/share/themes && \
+    cp -r /tmp/WhiteSur-gtk-theme/src/WhiteSur-Light /usr/share/themes/WhiteSur-Light && \
     rm -rf /tmp/WhiteSur-gtk-theme
 
 RUN git clone https://github.com/vinceliuice/WhiteSur-icon-theme.git --depth 1 /tmp/WhiteSur-icon-theme && \
-    /tmp/WhiteSur-icon-theme/install.sh && \
+    mkdir -p /usr/share/icons && \
+    cp -r /tmp/WhiteSur-icon-theme/src/WhiteSur /usr/share/icons/WhiteSur && \
     rm -rf /tmp/WhiteSur-icon-theme
 
 RUN git clone https://github.com/vinceliuice/McHigh-Cursors.git --depth 1 /tmp/McHigh-Cursors && \
+    mkdir -p /usr/share/icons && \
     cp -r /tmp/McHigh-Cursors/McHigh-cursor /usr/share/icons/ && \
     rm -rf /tmp/McHigh-Cursors
 
