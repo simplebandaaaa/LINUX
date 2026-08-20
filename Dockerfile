@@ -1,19 +1,12 @@
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV HOME=/root
+ENV USER=root
 
-# Multi-arch support block for Wine32
-RUN dpkg --add-architecture i386
-
-# Firefox via Mozilla PPA
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
-    gnupg \
-    ca-certificates && \
-    add-apt-repository -y ppa:mozillateam/ppa && \
-    printf 'Package: firefox*\nPin: release o=LP-PPA-mozillateam\nPin-Priority: 1001\n' > /etc/apt/preferences.d/mozilla-firefox
-
-# Essential packages + Reliable GTK themes
+# =========================================================
+# PACKAGES
+# =========================================================
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xrdp \
     xorgxrdp \
@@ -27,62 +20,106 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dbus-x11 \
     dbus-user-session \
     sudo \
-    curl \
     wget \
-    git \
-    tar \
-    gtk2-engines-murrine \
-    gtk2-engines-pixbuf \
-    numix-gtk-theme \
-    greybird-gtk-theme \
+    curl \
+    ca-certificates \
     ssl-cert \
-    wine64 \
-    wine32:i386 \
-    firefox && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    procps \
+    iproute2 \
+    net-tools \
+    falkon \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# ---- 🛠️ SAFE USER SETUP ---- #
-RUN echo "ubuntu:ubuntu" | chpasswd && \
-    usermod -aG sudo ubuntu && \
-    echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+# =========================================================
+# ROOT USER
+# =========================================================
+USER root
 
-# Grant Xorg execution permissions
-RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config && \
-    echo "needs_root_rights=yes" >> /etc/X11/Xwrapper.config
+WORKDIR /root
 
-# 🍎 WHITESUR GTK THEME & ICONS (GUARANTEED MANUAL INSTALL) 🍎
-RUN git clone https://github.com/vinceliuice/WhiteSur-gtk-theme.git --depth 1 /tmp/WhiteSur-gtk-theme && \
-    mkdir -p /home/ubuntu/.themes && \
-    cp -r /tmp/WhiteSur-gtk-theme/src/other/xfwm4 /home/ubuntu/.themes/WhiteSur-Light || true && \
-    /tmp/WhiteSur-gtk-theme/install.sh -d /home/ubuntu/.themes -t light -s standard --xfce || true && \
-    rm -rf /tmp/WhiteSur-gtk-theme
+RUN echo 'root:root' | chpasswd
 
-RUN git clone https://github.com/vinceliuice/WhiteSur-icon-theme.git --depth 1 /tmp/WhiteSur-icon-theme && \
-    mkdir -p /home/ubuntu/.icons && \
-    /tmp/WhiteSur-icon-theme/install.sh -d /home/ubuntu/.icons || true && \
-    rm -rf /tmp/WhiteSur-icon-theme
+# =========================================================
+# XORG CONFIGURATION
+# =========================================================
+RUN mkdir -p /etc/X11 && \
+    printf '%s\n' \
+    'allowed_users=anybody' \
+    'needs_root_rights=yes' \
+    > /etc/X11/Xwrapper.config
 
-# Copy user themes to system root to ensure detection
-RUN cp -r /home/ubuntu/.themes/* /usr/share/themes/ 2>/dev/null || true && \
-    cp -r /home/ubuntu/.icons/* /usr/share/icons/ 2>/dev/null || true
+# =========================================================
+# XRDP CONFIGURATION
+# =========================================================
+RUN sed -i 's/^crypt_level=.*/crypt_level=low/' /etc/xrdp/xrdp.ini || true && \
+    sed -i 's/^security_layer=.*/security_layer=rdp/' /etc/xrdp/xrdp.ini || true && \
+    sed -i 's/^max_bpp=.*/max_bpp=16/' /etc/xrdp/xrdp.ini || true && \
+    sed -i 's/^use_compression=.*/use_compression=yes/' /etc/xrdp/xrdp.ini || true && \
+    adduser xrdp ssl-cert || true
 
-# ⚡ XRDP SETTINGS ⚡
-RUN sed -i 's/crypt_level=high/crypt_level=low/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/security_layer=negotiate/security_layer=rdp/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/max_bpp=32/max_bpp=16/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/#tcp_send_buffer_size=32768/tcp_send_buffer_size=131072/' /etc/xrdp/xrdp.ini && \
-    adduser xrdp ssl-cert
+# =========================================================
+# XFCE ROOT SESSION
+# =========================================================
+RUN mkdir -p \
+    /root/.config/xfce4/xfconf/xfce-perchannel-xml \
+    /root/Desktop
 
-# Environment Scripts
-RUN printf 'export XDG_CURRENT_DESKTOP=XFCE\nexport XDG_SESSION_DESKTOP=xfce\nstartxfce4\n' > /home/ubuntu/.xsession && \
-    chmod +x /home/ubuntu/.xsession && \
-    cp /home/ubuntu/.xsession /home/ubuntu/.xsessionrc && \
-    chown -R ubuntu:ubuntu /home/ubuntu
+RUN printf '%s\n' \
+    '#!/bin/sh' \
+    'export HOME=/root' \
+    'export USER=root' \
+    'export XDG_CURRENT_DESKTOP=XFCE' \
+    'export XDG_SESSION_DESKTOP=xfce' \
+    'unset DBUS_SESSION_BUS_ADDRESS' \
+    'unset XDG_RUNTIME_DIR' \
+    'exec startxfce4' \
+    > /root/.xsession && \
+    chmod +x /root/.xsession
 
+# =========================================================
+# DISABLE XFCE COMPOSITING
+# =========================================================
+RUN printf '%s\n' \
+    '<?xml version="1.0" encoding="UTF-8"?>' \
+    '<channel name="xfwm4" version="1.0">' \
+    '<property name="general" type="empty">' \
+    '<property name="use_compositing" type="bool" value="false"/>' \
+    '</property>' \
+    '</channel>' \
+    > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
+
+# =========================================================
+# FALKON DESKTOP SHORTCUT
+# =========================================================
+RUN printf '%s\n' \
+    '[Desktop Entry]' \
+    'Version=1.0' \
+    'Type=Application' \
+    'Name=Falkon' \
+    'Comment=Web Browser' \
+    'Exec=falkon' \
+    'Icon=falkon' \
+    'Terminal=false' \
+    'Categories=Network;WebBrowser;' \
+    > /root/Desktop/falkon.desktop && \
+    chmod +x /root/Desktop/falkon.desktop
+
+# =========================================================
+# START SCRIPT
+# =========================================================
 COPY start.sh /start.sh
+
 RUN chmod +x /start.sh
 
+# =========================================================
+# XRDP PORT
+# =========================================================
 EXPOSE 3389
+
+# =========================================================
+# ROOT
+# =========================================================
+USER root
 
 CMD ["/start.sh"]
