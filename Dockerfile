@@ -35,9 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ROOT USER
 # =========================================================
 USER root
-
 WORKDIR /root
-
 RUN echo 'root:root' | chpasswd
 
 # =========================================================
@@ -71,8 +69,7 @@ RUN printf '%s\n' \
     'export USER=root' \
     'export XDG_CURRENT_DESKTOP=XFCE' \
     'export XDG_SESSION_DESKTOP=xfce' \
-    'unset DBUS_SESSION_BUS_ADDRESS' \
-    'unset XDG_RUNTIME_DIR' \
+    'eval $(dbus-launch --sh-syntax --exit-with-session)' \
     'exec startxfce4' \
     > /root/.xsession && \
     chmod +x /root/.xsession
@@ -90,8 +87,16 @@ RUN printf '%s\n' \
     > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
 
 # =========================================================
-# FALKON DESKTOP SHORTCUT
+# FALKON DESKTOP SHORTCUT & SYSTEM WRAPPER
 # =========================================================
+# Root user ke liye --no-sandbox flag ZAROORI hota hai
+RUN mv /usr/bin/falkon /usr/bin/falkon-bin && \
+    printf '%s\n' \
+    '#!/bin/sh' \
+    'exec /usr/bin/falkon-bin --no-sandbox "$@"' \
+    > /usr/bin/falkon && \
+    chmod +x /usr/bin/falkon
+
 RUN printf '%s\n' \
     '[Desktop Entry]' \
     'Version=1.0' \
@@ -109,7 +114,6 @@ RUN printf '%s\n' \
 # START SCRIPT
 # =========================================================
 COPY start.sh /start.sh
-
 RUN chmod +x /start.sh
 
 # =========================================================
@@ -117,9 +121,5 @@ RUN chmod +x /start.sh
 # =========================================================
 EXPOSE 3389
 
-# =========================================================
-# ROOT
-# =========================================================
 USER root
-
 CMD ["/start.sh"]
