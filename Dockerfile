@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     add-apt-repository -y ppa:mozillateam/ppa && \
     printf 'Package: firefox*\nPin: release o=LP-PPA-mozillateam\nPin-Priority: 1001\n' > /etc/apt/preferences.d/mozilla-firefox
 
-# Essential packages + macOS-like system themes & engines
+# Essential packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xrdp \
     xorgxrdp \
@@ -29,9 +29,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo \
     curl \
     wget \
-    git \
     tar \
-    bc \
+    xz-utils \
     gtk2-engines-murrine \
     gtk2-engines-pixbuf \
     ssl-cert \
@@ -50,14 +49,16 @@ RUN echo "ubuntu:ubuntu" | chpasswd && \
 RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config && \
     echo "needs_root_rights=yes" >> /etc/X11/Xwrapper.config
 
-# 🍎 WHITESUR GTK THEME & ICONS INSTALLATION 🍎
-RUN git clone https://github.com/vinceliuice/WhiteSur-gtk-theme.git --depth 1 /tmp/WhiteSur-gtk-theme && \
-    /tmp/WhiteSur-gtk-theme/install.sh --dest /usr/share/themes && \
-    rm -rf /tmp/WhiteSur-gtk-theme
+# 🍎 WHITESUR GTK THEME & ICONS (PRE-COMPILED RELEASES) 🍎
+# Install WhiteSur GTK Themes directly
+RUN mkdir -p /usr/share/themes && \
+    curl -sL https://github.com/vinceliuice/WhiteSur-gtk-theme/releases/latest/download/WhiteSur-Light.tar.xz | tar -xJ -C /usr/share/themes/ || \
+    curl -sL https://github.com/vinceliuice/WhiteSur-gtk-theme/archive/refs/heads/master.tar.gz | tar -xz -C /tmp && \
+    if [ -d /tmp/WhiteSur-gtk-theme-master ]; then cp -r /tmp/WhiteSur-gtk-theme-master /usr/share/themes/WhiteSur-Light; rm -rf /tmp/WhiteSur-gtk-theme-master; fi
 
-RUN git clone https://github.com/vinceliuice/WhiteSur-icon-theme.git --depth 1 /tmp/WhiteSur-icon-theme && \
-    /tmp/WhiteSur-icon-theme/install.sh -d /usr/share/icons && \
-    rm -rf /tmp/WhiteSur-icon-theme
+# Install WhiteSur Icon Theme directly
+RUN mkdir -p /usr/share/icons && \
+    curl -sL https://github.com/vinceliuice/WhiteSur-icon-theme/releases/latest/download/WhiteSur.tar.xz | tar -xJ -C /usr/share/icons/ || true
 
 # ⚡ SUPER SMOOTH & LIGHTWEIGHT XRDP SETTINGS ⚡
 RUN sed -i 's/crypt_level=high/crypt_level=low/' /etc/xrdp/xrdp.ini && \
