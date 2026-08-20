@@ -1,23 +1,12 @@
-#!/bin/bash
-set -e
+#!/bin/sh
 
-# Create runtime directory for D-Bus
-mkdir -p /run/user/1000
-chown -R ubuntu:ubuntu /run/user/1000
-chmod 700 /run/user/1000
+# D-Bus daemon system bus ko start aur setup karein
+mkdir -p /var/run/dbus
+dbus-daemon --system --fork
 
-# Fix permissions on Ubuntu home directory
-chown -R ubuntu:ubuntu /home/ubuntu
-
-# Start essential system services
-service dbus start
-
-# Clear old XRDP lock files if container restarted
-rm -f /var/run/xrdp/xrdp*.pid
-rm -f /var/run/xrdp/xrdp-sesman.pid
-
-# Start XRDP daemon
+# XRDP services start karein
 service xrdp start
+service xrdp-sesman start
 
-# Keep container running and output logs
-tail -f /var/log/xrdp.log
+# Container ko exit hone se rokne ke liye logs ko tail karein
+tail -f /var/log/xrdp.log /var/log/xrdp-sesman.log
