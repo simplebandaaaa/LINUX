@@ -4,7 +4,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HOME=/root \
     USER=root
 
-# 1. Mozilla PPA Add karke direct (non-snap) Firefox install karein
+# =========================================================
+# PACKAGES & MOZILLA PPA (Firefox Snap Workaround)
+# =========================================================
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     && add-apt-repository ppa:mozillateam/ppa -y \
@@ -34,13 +36,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     iproute2 \
     net-tools \
     firefox \
-    libasound2 \
+    libasound2t64 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /root
 
-# 2. System & XRDP Config
+# =========================================================
+# ROOT USER & SYSTEM CONFIG
+# =========================================================
 RUN echo 'root:root' | chpasswd && \
     adduser xrdp ssl-cert || true && \
     mkdir -p /var/run/xrdp /var/run/xrdp-sesman && \
@@ -50,12 +54,17 @@ RUN echo 'root:root' | chpasswd && \
     'needs_root_rights=yes' \
     > /etc/X11/Xwrapper.config
 
+# =========================================================
+# XRDP CONFIGURATION
+# =========================================================
 RUN sed -i 's/^crypt_level=.*/crypt_level=low/' /etc/xrdp/xrdp.ini || true && \
     sed -i 's/^security_layer=.*/security_layer=rdp/' /etc/xrdp/xrdp.ini || true && \
     sed -i 's/^max_bpp=.*/max_bpp=16/' /etc/xrdp/xrdp.ini || true && \
     sed -i 's/^use_compression=.*/use_compression=yes/' /etc/xrdp/xrdp.ini || true
 
-# 3. XFCE Session Config
+# =========================================================
+# XFCE SESSION CONFIGURATION
+# =========================================================
 RUN mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml /root/Desktop && \
     printf '%s\n' \
     '#!/bin/sh' \
@@ -77,7 +86,9 @@ RUN mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml /root/Desktop && \
     '</channel>' \
     > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
 
-# 4. Firefox Desktop Shortcut (Root Flag Fix)
+# =========================================================
+# FIREFOX DESKTOP SHORTCUT
+# =========================================================
 RUN printf '%s\n' \
     '[Desktop Entry]' \
     'Version=1.0' \
@@ -91,6 +102,9 @@ RUN printf '%s\n' \
     > /root/Desktop/firefox.desktop && \
     chmod +x /root/Desktop/firefox.desktop
 
+# =========================================================
+# START SCRIPT & EXPOSE
+# =========================================================
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
