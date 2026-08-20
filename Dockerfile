@@ -2,16 +2,10 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Multi-arch support block for Wine32
-RUN dpkg --add-architecture i386
-
-# Firefox के लिए Mozilla PPA
-RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common gnupg2 && \
-    add-apt-repository -y ppa:mozillateam/ppa && \
-    printf 'Package: firefox*\nPin: release o=LP-PPA-mozillateam\nPin-Priority: 1001\n' > /etc/apt/preferences.d/mozilla-firefox
-
-# आवश्यक पैकेजेस (केवल Xorgxrdp - TightVNC को पूरी तरह हटा दिया है ताकि कोई कन्फ्यूजन न हो)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    gnupg2 \
+    ca-certificates \
     xrdp \
     xorgxrdp \
     xserver-xorg-core \
@@ -27,42 +21,60 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     ssl-cert \
-    wine \
-    wine32:i386 \
-    firefox && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    firefox \
+    arc-theme \
+    papirus-icon-theme \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# ---- 🛠️ SAFE USER SETUP ---- #
-RUN echo "ubuntu:ubuntu" | chpasswd && \
+# Ubuntu user
+RUN useradd -m -s /bin/bash ubuntu && \
+    echo 'ubuntu:ubuntu' | chpasswd && \
     usermod -aG sudo ubuntu && \
-    echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+    echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ubuntu && \
+    chmod 440 /etc/sudoers.d/ubuntu
 
-# Ubuntu 24.04 में रूटलेस Xorg चलाने की परमिशन देना
-RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config && \
-    echo "needs_root_rights=no" >> /etc/X11/Xwrapper.config
+# Xorg permissions
+RUN mkdir -p /etc/X11 && \
+    printf 'allowed_users=anybody\nneeds_root_rights=no\n' \
+    > /etc/X11/Xwrapper.config
 
-# ⚡ SUPER SMOOTH & LIGHTWEIGHT XRDP SETTINGS ⚡
-# Xorg (Xorgxrdp) को डिफ़ॉल्ट बनाना और नेटवर्क बफ़र्स को ऑप्टिमाइज़ करना
-RUN sed -i 's/crypt_level=high/crypt_level=low/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/security_layer=negotiate/security_layer=rdp/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/max_bpp=32/max_bpp=16/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/use_compression=yes/use_compression=yes/' /etc/xrdp/xrdp.ini && \
-    sed -i 's/#tcp_send_buffer_size=32768/tcp_send_buffer_size=131072/' /etc/xrdp/xrdp.ini && \
-    adduser xrdp ssl-cert
+# XRDP configuration
+RUN adduser xrdp ssl-cert && \
+    sed -i 's/^crypt_level=.*/crypt_level=low/' /etc/xrdp/xrdp.ini && \
+    sed -i 's/^security_layer=.*/security_layer=rdp/' /etc/xrdp/xrdp.ini && \
+    sed -i 's/^max_bpp=.*/max_bpp=16/' /etc/xrdp/xrdp.ini
 
-# Xvnc/VNC को पूरी तरह ब्लॉक करके Xorg को पहला (डिफ़ॉल्ट) ऑप्शन सेट करना
-RUN sed -i 's/errorsesman/xrdp\/xorg/g' /etc/xrdp/sesman.ini
+# XFCE session
+RUN mkdir -p /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml && \
+    cat > /home/ubuntu/.xsession <<'EOF'
+#!/bin/bash
 
-# XFCE विज़ुअल एनिमेशन (Compositing) ऑफ करना ताकि लैग न हो
-RUN mkdir -p /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/ && \
-    printf '<?xml version="1.0" encoding="UTF-8"?><channel name="xfwm4" version="1.0"><property name="general" type="empty"><property name="use_compositing" type="bool" value="false"/></property></channel>' > /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
+export XDG_CURRENT_DESKTOP=XFCE
+export XDG_SESSION_DESKTOP=xfce
+export XDG_CONFIG_DIRS=/etc/xdg/xdg-xfce:/etc/xdg
+export XDG_DATA_DIRS=/usr/share/xfce4:/usr/local/share:/usr/share
 
-# XFCE एनवायरनमेंट स्क्रिप्ट्स (सिर्फ Xorg के लिए)
-RUN printf 'export XDG_CURRENT_DESKTOP=XFCE\nexport XDG_SESSION_DESKTOP=xfce\nunset DBUS_SESSION_BUS_ADDRESS\nunset XDG_RUNTIME_DIR\nstartxfce4\n' > /home/ubuntu/.xsession && \
-    chmod +x /home/ubuntu/.xsession && \
-    cp /home/ubuntu/.xsession /home/ubuntu/.xsessionrc && \
+unset DBUS_SESSION_BUS_ADDRESS
+unset XDG_RUNTIME_DIR
+
+dbus-launch --exit-with-session startxfce4
+EOF
+
+RUN chmod +x /home/ubuntu/.xsession && \
     chown -R ubuntu:ubuntu /home/ubuntu
+
+# Disable XFCE compositor for smoother RDP
+RUN cat > /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfwm4" version="1.0">
+  <property name="general" type="empty">
+    <property name="use_compositing" type="bool" value="false"/>
+  </property>
+</channel>
+EOF
+
+RUN chown -R ubuntu:ubuntu /home/ubuntu/.config
 
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
