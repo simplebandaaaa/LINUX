@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     add-apt-repository -y ppa:mozillateam/ppa && \
     printf 'Package: firefox*\nPin: release o=LP-PPA-mozillateam\nPin-Priority: 1001\n' > /etc/apt/preferences.d/mozilla-firefox
 
-# Essential packages
+# Essential packages + macOS-like system themes & engines
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xrdp \
     xorgxrdp \
@@ -31,6 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     git \
     tar \
+    bc \
     gtk2-engines-murrine \
     gtk2-engines-pixbuf \
     ssl-cert \
@@ -49,24 +50,14 @@ RUN echo "ubuntu:ubuntu" | chpasswd && \
 RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config && \
     echo "needs_root_rights=yes" >> /etc/X11/Xwrapper.config
 
-# 🍎 WHITESUR THEME & ICONS (DIRECT EXTRACT METHOD - NO INSTALLER SCRIPT) 🍎
-# Download & Extract WhiteSur GTK Theme
-RUN mkdir -p /usr/share/themes && \
-    curl -sL https://github.com/vinceliuice/WhiteSur-gtk-theme/archive/refs/heads/master.tar.gz | tar -xz -C /tmp && \
-    mv /tmp/WhiteSur-gtk-theme-master/src/WhiteSur-Light /usr/share/themes/ 2>/dev/null || \
-    cp -r /tmp/WhiteSur-gtk-theme-master /usr/share/themes/WhiteSur-Light && \
-    rm -rf /tmp/WhiteSur-gtk-theme-master
+# 🍎 WHITESUR GTK THEME & ICONS INSTALLATION 🍎
+RUN git clone https://github.com/vinceliuice/WhiteSur-gtk-theme.git --depth 1 /tmp/WhiteSur-gtk-theme && \
+    /tmp/WhiteSur-gtk-theme/install.sh --dest /usr/share/themes && \
+    rm -rf /tmp/WhiteSur-gtk-theme
 
-# Download & Extract WhiteSur Icons
-RUN mkdir -p /usr/share/icons && \
-    git clone https://github.com/vinceliuice/WhiteSur-icon-theme.git --depth 1 /tmp/WhiteSur-icon-theme && \
-    cp -r /tmp/WhiteSur-icon-theme/src/WhiteSur /usr/share/icons/WhiteSur && \
+RUN git clone https://github.com/vinceliuice/WhiteSur-icon-theme.git --depth 1 /tmp/WhiteSur-icon-theme && \
+    /tmp/WhiteSur-icon-theme/install.sh -d /usr/share/icons && \
     rm -rf /tmp/WhiteSur-icon-theme
-
-# Download & Extract macOS Cursors
-RUN git clone https://github.com/vinceliuice/McHigh-Cursors.git --depth 1 /tmp/McHigh-Cursors && \
-    cp -r /tmp/McHigh-Cursors/McHigh-cursor /usr/share/icons/ && \
-    rm -rf /tmp/McHigh-Cursors
 
 # ⚡ SUPER SMOOTH & LIGHTWEIGHT XRDP SETTINGS ⚡
 RUN sed -i 's/crypt_level=high/crypt_level=low/' /etc/xrdp/xrdp.ini && \
@@ -78,13 +69,12 @@ RUN sed -i 's/crypt_level=high/crypt_level=low/' /etc/xrdp/xrdp.ini && \
 # 🍎 DEFAULT XFCE CONFIGURATION FOR WHITESUR THEME 🍎
 RUN mkdir -p /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/
 
-# Apply WhiteSur GTK & Window Theme
+# Apply WhiteSur GTK & Icon Theme
 RUN printf '<?xml version="1.0" encoding="UTF-8"?>\n\
 <channel name="xsettings" version="1.0">\n\
   <property name="Net" type="empty">\n\
     <property name="ThemeName" type="string" value="WhiteSur-Light"/>\n\
     <property name="IconThemeName" type="string" value="WhiteSur"/>\n\
-    <property name="CursorThemeName" type="string" value="McHigh-cursor"/>\n\
   </property>\n\
 </channel>' > /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
 
