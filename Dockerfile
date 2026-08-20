@@ -1,81 +1,72 @@
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV LANG=C.UTF-8
-ENV LC_ALL=C.UTF-8
 
-# XRDP + Xorg + XFCE
+# Multi-arch support block for Wine32
+RUN dpkg --add-architecture i386
+
+# Firefox के लिए Mozilla PPA
+RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common gnupg2 && \
+    add-apt-repository -y ppa:mozillateam/ppa && \
+    printf 'Package: firefox*\nPin: release o=LP-PPA-mozillateam\nPin-Priority: 1001\n' > /etc/apt/preferences.d/mozilla-firefox
+
+# आवश्यक पैकेजेस (केवल Xorgxrdp - TightVNC को पूरी तरह हटा दिया है ताकि कोई कन्फ्यूजन न हो)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xrdp \
     xorgxrdp \
     xserver-xorg-core \
     xfce4 \
-    xfce4-session \
     xfce4-panel \
-    xfce4-settings \
     xfwm4 \
-    xfdesktop4 \
+    xfce4-settings \
+    xfce4-session \
     xfce4-terminal \
     dbus-x11 \
     dbus-user-session \
-    policykit-1 \
     sudo \
-    ca-certificates \
-    procps \
-    iproute2 \
-    net-tools \
-    && rm -rf /var/lib/apt/lists/*
+    curl \
+    wget \
+    ssl-cert \
+    wine \
+    wine32:i386 \
+    firefox && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# RDP user
-RUN useradd -m -s /bin/bash rdpuser \
-    && echo 'rdpuser:rdp123' | chpasswd \
-    && usermod -aG sudo,audio,video,ssl-cert rdpuser
+# ---- 🛠️ SAFE USER SETUP ---- #
+RUN echo "ubuntu:ubuntu" | chpasswd && \
+    usermod -aG sudo ubuntu && \
+    echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# XRDP -> XFCE
-RUN cat > /etc/xrdp/startwm.sh <<'EOF'
-#!/bin/sh
+# Ubuntu 24.04 में रूटलेस Xorg चलाने की परमिशन देना
+RUN echo "allowed_users=anybody" > /etc/X11/Xwrapper.config && \
+    echo "needs_root_rights=no" >> /etc/X11/Xwrapper.config
 
-unset DBUS_SESSION_BUS_ADDRESS
-unset SESSION_MANAGER
-unset XDG_RUNTIME_DIR
+# ⚡ SUPER SMOOTH & LIGHTWEIGHT XRDP SETTINGS ⚡
+# Xorg (Xorgxrdp) को डिफ़ॉल्ट बनाना और नेटवर्क बफ़र्स को ऑप्टिमाइज़ करना
+RUN sed -i 's/crypt_level=high/crypt_level=low/' /etc/xrdp/xrdp.ini && \
+    sed -i 's/security_layer=negotiate/security_layer=rdp/' /etc/xrdp/xrdp.ini && \
+    sed -i 's/max_bpp=32/max_bpp=16/' /etc/xrdp/xrdp.ini && \
+    sed -i 's/use_compression=yes/use_compression=yes/' /etc/xrdp/xrdp.ini && \
+    sed -i 's/#tcp_send_buffer_size=32768/tcp_send_buffer_size=131072/' /etc/xrdp/xrdp.ini && \
+    adduser xrdp ssl-cert
 
-export LANG=C.UTF-8
-export LC_ALL=C.UTF-8
-export XDG_CURRENT_DESKTOP=XFCE
-export XDG_SESSION_DESKTOP=xfce
-export XDG_CONFIG_DIRS=/etc/xdg/xdg-xfce:/etc/xdg
-export XDG_DATA_DIRS=/usr/share/xfce4:/usr/local/share:/usr/share
+# Xvnc/VNC को पूरी तरह ब्लॉक करके Xorg को पहला (डिफ़ॉल्ट) ऑप्शन सेट करना
+RUN sed -i 's/errorsesman/xrdp\/xorg/g' /etc/xrdp/sesman.ini
 
-exec dbus-launch --exit-with-session startxfce4
-EOF
+# XFCE विज़ुअल एनिमेशन (Compositing) ऑफ करना ताकि लैग न हो
+RUN mkdir -p /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/ && \
+    printf '<?xml version="1.0" encoding="UTF-8"?><channel name="xfwm4" version="1.0"><property name="general" type="empty"><property name="use_compositing" type="bool" value="false"/></property></channel>' > /home/ubuntu/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
 
-RUN chmod 755 /etc/xrdp/startwm.sh
+# XFCE एनवायरनमेंट स्क्रिप्ट्स (सिर्फ Xorg के लिए)
+RUN printf 'export XDG_CURRENT_DESKTOP=XFCE\nexport XDG_SESSION_DESKTOP=xfce\nunset DBUS_SESSION_BUS_ADDRESS\nunset XDG_RUNTIME_DIR\nstartxfce4\n' > /home/ubuntu/.xsession && \
+    chmod +x /home/ubuntu/.xsession && \
+    cp /home/ubuntu/.xsession /home/ubuntu/.xsessionrc && \
+    chown -R ubuntu:ubuntu /home/ubuntu
 
-# Explicit XFCE session for RDP user
-RUN cat > /home/rdpuser/.xsession <<'EOF'
-#!/bin/sh
-
-unset DBUS_SESSION_BUS_ADDRESS
-unset SESSION_MANAGER
-unset XDG_RUNTIME_DIR
-
-export LANG=C.UTF-8
-export LC_ALL=C.UTF-8
-export XDG_CURRENT_DESKTOP=XFCE
-export XDG_SESSION_DESKTOP=xfce
-
-exec dbus-launch --exit-with-session startxfce4
-EOF
-
-RUN chmod 755 /home/rdpuser/.xsession \
-    && chown rdpuser:rdpuser /home/rdpuser/.xsession \
-    && mkdir -p /home/rdpuser/.config \
-    && chown -R rdpuser:rdpuser /home/rdpuser
-
-COPY start.sh /usr/local/bin/start.sh
-
-RUN chmod 755 /usr/local/bin/start.sh
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
 
 EXPOSE 3389
 
-ENTRYPOINT ["/usr/local/bin/start.sh"]
+CMD ["/start.sh"]
